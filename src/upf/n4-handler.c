@@ -211,7 +211,7 @@ void upf_n4_handle_session_establishment_request(
     /* Send Buffered Packet to gNB/SGW */
     ogs_list_for_each(&sess->pfcp.pdr_list, pdr) {
         if (pdr->src_if == OGS_PFCP_INTERFACE_CORE) { /* Downlink */
-            ogs_pfcp_send_buffered_gtpu(pdr);
+            ogs_pfcp_send_buffered_packet(pdr);
         }
     }
 
@@ -414,7 +414,7 @@ void upf_n4_handle_session_modification_request(
     /* Send Buffered Packet to gNB/SGW */
     ogs_list_for_each(&sess->pfcp.pdr_list, pdr) {
         if (pdr->src_if == OGS_PFCP_INTERFACE_CORE) { /* Downlink */
-            ogs_pfcp_send_buffered_gtpu(pdr);
+            ogs_pfcp_send_buffered_packet(pdr);
         }
     }
 

@@ -34,6 +34,7 @@ int upf_initialize(void)
 #define APP_NAME "upf"
     rv = ogs_app_parse_local_conf(APP_NAME);
     if (rv != OGS_OK) return rv;
+    //解析本地配置文件（如upf.yaml）
 
     upf_metrics_init();
 

@@ -1,0 +1,165 @@
+logger:
+  file:
+    path: @localstatedir@/log/open5gs/dsmf.log
+#  level: info   # fatal|error|warn|info(default)|debug|trace
+
+global:
+  max:
+    ue: 1024  # The number of UE can be increased depending on memory size.
+#    peer: 64
+
+dsmf:
+  sbi:
+    server:
+      - address: 127.0.0.23
+        port: 7777
+    client:
+      nrf:
+        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+  pfcp:
+    server:
+      - address: 127.0.0.23
+        port: 8806
+    client:
+      df:
+        - address: 127.0.0.22
+          port: 8805
+  metrics:
+    server:
+      - address: 127.0.0.23
+        port: 9090
+  gnb_sync:
+    # gNB同步配置
+    timeout: 30  # 同步超时时间（秒）
+    retry_count: 3  # 重试次数
+    heartbeat_interval: 60  # 心跳间隔（秒）
+
+################################################################################
+# SBI Server
+################################################################################
+#  o Bind to the address on the eth0 and advertise as open5gs-dsmf.svc.local
+#  sbi:
+#    server:
+#      - dev:eth0
+#        advertise: open5gs-dsmf.svc.local
+#
+#  o Specify a custom port number 7777 while binding to the given address
+#  sbi:
+#    server:
+#      - address: dsmf.localdomain
+#        port: 7777
+#
+#  o Bind to 127.0.0.23 and advertise as open5gs-dsmf.svc.local
+#  sbi:
+#    server:
+#      - address: 127.0.0.23
+#        port: 7777
+#        advertise: open5gs-dsmf.svc.local
+#
+#  o Bind to port 7777 but advertise with a different port number 8888
+#  sbi:
+#    server:
+#      - address: 127.0.0.23
+#        port: 7777
+#        advertise: open5gs-dsmf.svc.local:8888
+#
+################################################################################
+# SBI Client
+################################################################################
+#  o Direct Communication with NRF
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#
+#  o Indirect Communication by Delegating to SCP
+#  sbi:
+#    client:
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#
+#  o Indirect Communication without Delegation
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#      delegated:
+#        nrf:
+#          nfm: no    # Directly communicate NRF management functions
+#          disc: no   # Directly communicate NRF discovery
+#        scp:
+#          next: no   # Do not delegate to SCP for next-hop
+#
+#  o Indirect Communication with Delegated Discovery
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#      delegated:
+#        nrf:
+#          nfm: no    # Directly communicate NRF management functions
+#          disc: yes  # Delegate discovery to SCP
+#        scp:
+#          next: yes  # Delegate to SCP for next-hop
+#
+################################################################################
+# PFCP Server
+################################################################################
+#  o Bind to the address on the eth0
+#  pfcp:
+#    server:
+#      - dev:eth0
+#
+#  o Specify a custom port number 8805 while binding to the given address
+#  pfcp:
+#    server:
+#      - address: dsmf.localdomain
+#        port: 8805
+#
+#  o Bind to 127.0.0.23
+#  pfcp:
+#    server:
+#      - address: 127.0.0.23
+#
+################################################################################
+# PFCP Client
+################################################################################
+#  o Direct Communication with DF
+#  pfcp:
+#    client:
+#      df:
+#        - address: 127.0.0.22
+#
+#  o Multiple DF instances
+#  pfcp:
+#    client:
+#      df:
+#        - address: 127.0.0.22
+#        - address: 127.0.0.24
+#
+################################################################################
+# Metrics Server
+################################################################################
+#  o Bind to the address on the eth0
+#  metrics:
+#    server:
+#      - dev:eth0
+#        port: 9090
+#
+#  o Specify a custom port number 9090 while binding to the given address
+#  metrics:
+#    server:
+#      - address: dsmf.localdomain
+#        port: 9090
+#
+#  o Bind to 127.0.0.23
+#  metrics:
+#    server:
+#      - address: 127.0.0.23
+#        port: 9090 

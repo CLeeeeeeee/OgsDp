@@ -100,6 +100,15 @@ void scp_terminate(void);
 int sepp_initialize(void);
 void sepp_terminate(void);
 
+int dmf_initialize(void);
+void dmf_terminate(void);
+
+int df_initialize(void);
+void df_terminate(void);
+
+int dsmf_initialize(void);
+void dsmf_terminate(void);
+
 #ifdef __cplusplus
 }
 #endif

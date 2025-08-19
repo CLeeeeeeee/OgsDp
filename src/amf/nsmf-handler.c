@@ -767,9 +767,10 @@ int amf_nsmf_pdusession_handle_update_sm_context(
             } else if (state == AMF_REMOVE_S1_CONTEXT_BY_LO_CONNREFUSED) {
                 if (AMF_SESSION_SYNC_DONE(amf_ue, state)) {
 
+                    amf_ue_deassociate(amf_ue);
+
                     if (ran_ue) {
                         ogs_debug("    SUPI[%s]", amf_ue->supi);
-                        amf_ue_deassociate_ran_ue(amf_ue, ran_ue);
                         ran_ue_remove(ran_ue);
                     } else {
                         ogs_warn("[%s] RAN-NG Context has already been removed",
@@ -811,13 +812,14 @@ int amf_nsmf_pdusession_handle_update_sm_context(
             } else if (state == AMF_REMOVE_S1_CONTEXT_BY_RESET_ALL) {
                 if (AMF_SESSION_SYNC_DONE(amf_ue, state)) {
 
+                    amf_ue_deassociate(amf_ue);
+
                     if (ran_ue) {
                         amf_gnb_t *gnb = NULL;
 
                         gnb = amf_gnb_find_by_id(ran_ue->gnb_id);
 
                         ogs_debug("    SUPI[%s]", amf_ue->supi);
-                        amf_ue_deassociate_ran_ue(amf_ue, ran_ue);
                         ran_ue_remove(ran_ue);
 
                         if (gnb && ogs_list_count(&gnb->ran_ue_list) == 0) {
@@ -867,13 +869,14 @@ int amf_nsmf_pdusession_handle_update_sm_context(
                 if (AMF_SESSION_SYNC_DONE(amf_ue, state)) {
                     ran_ue_t *iter = NULL;
 
+                    amf_ue_deassociate(amf_ue);
+
                     if (ran_ue) {
                         amf_gnb_t *gnb = NULL;
 
                         gnb = amf_gnb_find_by_id(ran_ue->gnb_id);
 
                         ogs_debug("    SUPI[%s]", amf_ue->supi);
-                        amf_ue_deassociate_ran_ue(amf_ue, ran_ue);
                         ran_ue_remove(ran_ue);
 
                         if (gnb) {
@@ -1139,7 +1142,7 @@ int amf_nsmf_pdusession_handle_release_sm_context(amf_sess_t *sess, int state)
     if (sess->old_gsm_type == OGS_NAS_5GS_PDU_SESSION_RELEASE_COMPLETE &&
         sess->current_gsm_type ==
             OGS_NAS_5GS_PDU_SESSION_ESTABLISHMENT_REQUEST) {
-        ogs_warn("[%s:%d] Session retained: reactivation has been requested",
+        ogs_error("[%s:%d] Do not remove Session due to Reactivation-requested",
                 amf_ue->supi, sess->psi);
 
         /*
@@ -1381,26 +1384,12 @@ int amf_nsmf_pdusession_handle_release_sm_context(amf_sess_t *sess, int state)
 
                 } else if (OGS_FSM_CHECK(
                             &amf_ue->sm, gmm_state_security_mode)) {
-    /*
-     * [Issue #4012]
-     * avoid abort on SM context release in security-mode state.
-     *
-     * Replace ogs_assert_if_reached() with ogs_error to log the invalid state
-     * and keep AMF running; logs error for debugging and improves availability.
-     */
-                    ogs_error("Invalid state transition: cannot release "
-                            "SM Context during security-mode state");
+                    ogs_fatal("Release SM Context in security-mode");
+                    ogs_assert_if_reached();
                 } else if (OGS_FSM_CHECK(&amf_ue->sm,
                                 gmm_state_initial_context_setup)) {
-    /*
-     * [Issue #3946]
-     * avoid abort on SM context release in initial-setup state.
-     *
-     * Replace ogs_assert_if_reached() with ogs_error to log the invalid state
-     * and keep AMF running; logs error for debugging and improves availability.
-     */
-                    ogs_error("Invalid state transition: cannot release "
-                            "SM Context during initial-context-setup");
+                    ogs_fatal("Release SM Context in initial-context-setup");
+                    ogs_assert_if_reached();
                 } else if (OGS_FSM_CHECK(&amf_ue->sm, gmm_state_registered)) {
                     /*
                      * 1. PDU session release request

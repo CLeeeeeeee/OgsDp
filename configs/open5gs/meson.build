@@ -38,6 +38,9 @@ open5gs_conf = '''
     pcf.yaml
     nssf.yaml
     bsf.yaml
+    dmf.yaml
+    df.yaml
+    dsmf.yaml
 '''.split()
 
 foreach file : open5gs_conf

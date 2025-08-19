@@ -21,6 +21,7 @@
 #include "ngap-path.h"
 #include "sbi-path.h"
 #include "nas-path.h"
+#include "ngap-build.h"
 
 static bool maximum_number_of_gnbs_is_reached(void)
 {
@@ -1755,6 +1756,12 @@ void ngap_handle_ue_context_release_action(ran_ue_t *ran_ue)
         break;
     case NGAP_UE_CTX_REL_NG_REMOVE_AND_UNLINK:
         ogs_debug("    Action: NG normal release");
+        ran_ue_remove(ran_ue);
+        if (!amf_ue) {
+            ogs_error("No UE(amf-ue) Context");
+            return;
+        }
+        amf_ue_deassociate(amf_ue);
 
         /*
          * When AMF release the NAS signalling connection,
@@ -1783,14 +1790,9 @@ void ngap_handle_ue_context_release_action(ran_ue_t *ran_ue)
          * TODO: If the UE is registered for emergency services, the AMF shall
          * set the mobile reachable timer with a value equal to timer T3512.
          */
-        if (amf_ue) {
-            amf_ue_deassociate_ran_ue(amf_ue, ran_ue);
-            ogs_timer_start(amf_ue->mobile_reachable.timer,
-                    ogs_time_from_sec(amf_self()->time.t3512.value + 240));
-        } else
-            ogs_error("No UE(amf-ue) Context");
+        ogs_timer_start(amf_ue->mobile_reachable.timer,
+                ogs_time_from_sec(amf_self()->time.t3512.value + 240));
 
-        ran_ue_remove(ran_ue);
         break;
 
     case NGAP_UE_CTX_REL_UE_CONTEXT_REMOVE:
@@ -2030,6 +2032,76 @@ void ngap_handle_pdu_session_resource_setup_response(
                     amf_ue->supi, sess->psi, ran_ue->psimask.activated);
             ran_ue->psimask.activated |= ((1 << sess->psi));
             ogs_debug("    NEW ACTIVATED[0x%x]", ran_ue->psimask.activated);
+
+            // 新增：解析 RAN F-TEID 信息并转发给 DMF
+            if (transfer && transfer->buf && transfer->size > 0) {
+                int rv;
+                NGAP_PDUSessionResourceSetupResponseTransfer_t setup_response;
+                NGAP_QosFlowPerTNLInformation_t *dLQosFlowPerTNLInformation = NULL;
+                NGAP_UPTransportLayerInformation_t *uPTransportLayerInformation = NULL;
+                NGAP_GTPTunnel_t *gTPTunnel = NULL;
+                uint32_t gnb_n3_teid;
+                ogs_ip_t gnb_n3_ip;
+                char gnb_id_str[64];
+                char session_id[64];
+                char ran_addr_str[OGS_ADDRSTRLEN];
+
+                // 解析 NGAP 传输消息
+                ogs_pkbuf_t *pkbuf = ogs_pkbuf_alloc(NULL, transfer->size);
+                if (pkbuf) {
+                    memcpy(pkbuf->data, transfer->buf, transfer->size);
+                    pkbuf->len = transfer->size;
+                    rv = ogs_asn_decode(
+                            &asn_DEF_NGAP_PDUSessionResourceSetupResponseTransfer,
+                            &setup_response, sizeof(setup_response), pkbuf);
+                    ogs_pkbuf_free(pkbuf);
+                } else {
+                    rv = OGS_ERROR;
+                }
+                if (rv == OGS_OK) {
+                    dLQosFlowPerTNLInformation = &setup_response.dLQosFlowPerTNLInformation;
+                    uPTransportLayerInformation = &dLQosFlowPerTNLInformation->uPTransportLayerInformation;
+
+                    if (uPTransportLayerInformation->present == NGAP_UPTransportLayerInformation_PR_gTPTunnel) {
+                        gTPTunnel = uPTransportLayerInformation->choice.gTPTunnel;
+                        if (gTPTunnel) {
+                            // 解析 RAN 地址和 TEID
+                            rv = ogs_asn_BIT_STRING_to_ip(&gTPTunnel->transportLayerAddress, &gnb_n3_ip);
+                            if (rv == OGS_OK) {
+                                ogs_asn_OCTET_STRING_to_uint32(&gTPTunnel->gTP_TEID, &gnb_n3_teid);
+
+                                // 构造 gNB ID
+                                snprintf(gnb_id_str, sizeof(gnb_id_str), "%u", gnb->gnb_id);
+                                
+                                // 构造会话 ID
+                                snprintf(session_id, sizeof(session_id), "%s_%d", amf_ue->supi, sess->psi);
+                                
+                                // 构造 RAN 地址字符串
+                                if (gnb_n3_ip.ipv4) {
+                                    ogs_sockaddr_t addr;
+                                    addr.ogs_sa_family = AF_INET;
+                                    addr.sin.sin_addr.s_addr = gnb_n3_ip.addr;
+                                    ogs_inet_ntop(&addr, ran_addr_str, sizeof(ran_addr_str));
+                                } else if (gnb_n3_ip.ipv6) {
+                                    ogs_sockaddr_t addr;
+                                    addr.ogs_sa_family = AF_INET6;
+                                    memcpy(&addr.sin6.sin6_addr, gnb_n3_ip.addr6, OGS_IPV6_LEN);
+                                    ogs_inet_ntop(&addr, ran_addr_str, sizeof(ran_addr_str));
+                                } else {
+                                    strcpy(ran_addr_str, "0.0.0.0");
+                                }
+
+                                // 转发 RAN 信息给 DMF
+                                amf_sbi_send_gnb_sync_with_ran_info_to_dmf(
+                                    gnb_id_str, session_id, ran_addr_str, 2152, gnb_n3_teid);
+
+                                ogs_info("[AMF] Forwarded RAN info to DMF: gNB=%s, Session=%s, RAN=%s:%d, TEID=0x%x",
+                                         gnb_id_str, session_id, ran_addr_str, 2152, gnb_n3_teid);
+                            }
+                        }
+                    }
+                }
+            }
 
             memset(&param, 0, sizeof(param));
             param.n2smbuf = ogs_pkbuf_alloc(NULL, OGS_MAX_SDU_LEN);
@@ -4053,7 +4125,6 @@ void ngap_handle_handover_notification(
 {
     char buf[OGS_ADDRSTRLEN];
     int i, r;
-    int xact_count;
 
     amf_ue_t *amf_ue = NULL;
     amf_sess_t *sess = NULL;
@@ -4213,14 +4284,15 @@ void ngap_handle_handover_notification(
     ogs_expect(r == OGS_OK);
     ogs_assert(r != OGS_ERROR);
 
-    /* Save the number of ongoing SMF transactions before processing sessions */
-    xact_count = amf_sess_xact_count(amf_ue);
-
     ogs_list_for_each(&amf_ue->sess_list, sess) {
         if (!SESSION_CONTEXT_IN_SMF(sess)) {
-            /* Warn if this UE session is not handled by SMF and skip it */
-            ogs_warn("Session Context is not in SMF [%d]", sess->psi);
-            continue;
+            ogs_error("Session Context is not in SMF [%d]", sess->psi);
+            r = ngap_send_error_indication2(source_ue,
+                    NGAP_Cause_PR_radioNetwork,
+                    NGAP_CauseRadioNetwork_partial_handover);
+            ogs_expect(r == OGS_OK);
+            ogs_assert(r != OGS_ERROR);
+            return;
         }
 
         memset(&param, 0, sizeof(param));
@@ -4230,19 +4302,6 @@ void ngap_handle_handover_notification(
                 OGS_SBI_SERVICE_TYPE_NSMF_PDUSESSION, NULL,
                 amf_nsmf_pdusession_build_update_sm_context,
                 source_ue, sess, AMF_UPDATE_SM_CONTEXT_HANDOVER_NOTIFY, &param);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
-    }
-
-    /*
-     * If no SMF sessions were processed (transaction count unchanged),
-     * send partial-handover error
-     */
-    if (xact_count == amf_sess_xact_count(amf_ue)) {
-        ogs_error("No SMF session were processed [%d]", sess->psi);
-        r = ngap_send_error_indication2(source_ue,
-                NGAP_Cause_PR_radioNetwork,
-                NGAP_CauseRadioNetwork_partial_handover);
         ogs_expect(r == OGS_OK);
         ogs_assert(r != OGS_ERROR);
     }

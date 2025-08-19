@@ -1,0 +1,172 @@
+logger:
+  file:
+    path: @localstatedir@/log/open5gs/dmf.log
+#  level: info   # fatal|error|warn|info(default)|debug|trace
+
+global:
+  max:
+    gnb: 256  # 最大支持的gNB数量
+#    peer: 64
+
+dmf:
+  sbi:
+    server:
+      - address: 127.0.0.21
+        port: 7777
+    client:
+      nrf:
+        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+  metrics:
+    server:
+      - address: 127.0.0.21
+        port: 9090
+  gnb_sync:
+    # gNB同步配置
+    timeout: 30  # 同步超时时间（秒）
+    retry_count: 3  # 重试次数
+    heartbeat_interval: 60  # 心跳间隔（秒）
+
+################################################################################
+# SBI Server
+################################################################################
+#  o Bind to the address on the eth0 and advertise as open5gs-dmf.svc.local
+#  sbi:
+#    server:
+#      - dev:eth0
+#        advertise: open5gs-dmf.svc.local
+#
+#  o Specify a custom port number 7777 while binding to the given address
+#  sbi:
+#    server:
+#      - address: dmf.localdomain
+#        port: 7777
+#
+#  o Bind to 127.0.0.16 and advertise as open5gs-dmf.svc.local
+#  sbi:
+#    server:
+#      - address: 127.0.0.16
+#        port: 7777
+#        advertise: open5gs-dmf.svc.local
+#
+#  o Bind to port 7777 but advertise with a different port number 8888
+#  sbi:
+#    server:
+#      - address: 127.0.0.16
+#        port: 7777
+#        advertise: open5gs-dmf.svc.local:8888
+#
+################################################################################
+# SBI Client
+################################################################################
+#  o Direct Communication with NRF
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#
+#  o Indirect Communication by Delegating to SCP
+#  sbi:
+#    client:
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#
+#  o Indirect Communication without Delegation
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#      delegated:
+#        nrf:
+#          nfm: no    # Directly communicate NRF management functions
+#          disc: no   # Directly communicate NRF discovery
+#        scp:
+#          next: no   # Do not delegate to SCP for next-hop
+#
+#  o Indirect Communication with Delegated Discovery
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#      delegated:
+#        nrf:
+#          nfm: no    # Directly communicate NRF management functions
+#          disc: yes  # Delegate discovery to SCP
+#        scp:
+#          next: yes  # Delegate to SCP for next-hop communications
+#
+#  o Default delegation: all communications are delegated to the SCP
+#  sbi:
+#    client:
+#      nrf:
+#        - uri: http://127.0.0.10:7777
+#      scp:
+#        - uri: http://127.0.0.200:7777
+#      # No 'delegated' section; defaults to AUTO delegation
+#
+################################################################################
+# HTTPS scheme with TLS
+################################################################################
+#  o Set as default if not individually set
+#  default:
+#    tls:
+#      server:
+#        scheme: https
+#        private_key: @sysconfdir@/open5gs/tls/dmf.key
+#        cert: @sysconfdir@/open5gs/tls/dmf.crt
+#      client:
+#        scheme: https
+#        cacert: @sysconfdir@/open5gs/tls/ca.crt
+#  sbi:
+#    server:
+#      - address: dmf.localdomain
+#    client:
+#      nrf:
+#        - uri: https://nrf.localdomain
+#
+#  o Enable SSL key logging for Wireshark
+#    - This configuration allows capturing SSL/TLS session keys
+#      for debugging or analysis purposes using Wireshark.
+#  default:
+#    tls:
+#      server:
+#        scheme: https
+#        private_key: @sysconfdir@/open5gs/tls/dmf.key
+#        cert: @sysconfdir@/open5gs/tls/dmf.crt
+#        sslkeylogfile: @localstatedir@/log/open5gs/tls/dmf-server-sslkeylog.log
+#      client:
+#        scheme: https
+#        cacert: @sysconfdir@/open5gs/tls/ca.crt
+#        client_sslkeylogfile: @localstatedir@/log/open5gs/tls/dmf-client-sslkeylog.log
+#  sbi:
+#    server:
+#      - address: dmf.localdomain
+#    client:
+#      nrf:
+#        - uri: https://nrf.localdomain
+#
+#  o Add client TLS verification
+#  default:
+#    tls:
+#      server:
+#        scheme: https
+#        private_key: @sysconfdir@/open5gs/tls/dmf.key
+#        cert: @sysconfdir@/open5gs/tls/dmf.crt
+#        verify_client: true
+#        verify_client_cacert: @sysconfdir@/open5gs/tls/ca.crt
+#      client:
+#        scheme: https
+#        cacert: @sysconfdir@/open5gs/tls/ca.crt
+#        client_private_key: @sysconfdir@/open5gs/tls/dmf.key
+#        client_cert: @sysconfdir@/open5gs/tls/dmf.crt
+#  sbi:
+#    server:
+#      - address: dmf.localdomain
+#    client:
+#      nrf:
+#        - uri: https://nrf.localdomain 

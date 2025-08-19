@@ -146,85 +146,85 @@ typedef struct ogs_pfcp_qer_s ogs_pfcp_qer_t;
 typedef struct ogs_pfcp_bar_s ogs_pfcp_bar_t;
 
 typedef struct ogs_pfcp_pdr_s {
-    ogs_pfcp_object_t       obj;
+    ogs_pfcp_object_t       obj; /* Object 对象*/
 
-    ogs_pool_id_t           *teid_node;  /* A node of TEID */
-    ogs_pool_id_t           teid;
+    ogs_pool_id_t           *teid_node;  /* A node of TEID 基础TEID节点*/
+    ogs_pool_id_t           teid;         /* TEID 基础TEID*/
 
-    ogs_lnode_t             to_create_node;
-    ogs_lnode_t             to_modify_node;
+    ogs_lnode_t             to_create_node; /* To create node 创建节点*/
+    ogs_lnode_t             to_modify_node; /* To modify node 修改节点*/
 
     struct {
         struct {
-            int len;
-            uint32_t key;
-        } teid;
-    } hash;
+            int len; /* Length 长度*/
+            uint32_t key; /* Key 键*/
+        } teid; /* TEID 基础TEID*/
+    } hash; /* Hash 哈希*/
 
-    uint8_t                 *id_node;      /* Pool-Node for ID */
-    ogs_pfcp_pdr_id_t       id;
-    ogs_pfcp_precedence_t   precedence;
-    ogs_pfcp_interface_t    src_if;
+    uint8_t                 *id_node;      /* Pool-Node for ID 池节点*/
+    ogs_pfcp_pdr_id_t       id;           /* PDR ID 优先级调度规则ID*/
+    ogs_pfcp_precedence_t   precedence;   /* Precedence 优先级*/
+    ogs_pfcp_interface_t    src_if;       /* Source interface 源接口*/
 
-    bool src_if_type_presence;
-    ogs_pfcp_3gpp_interface_type_t src_if_type;
+    bool src_if_type_presence; /* Source interface type presence 源接口类型存在*/
+    ogs_pfcp_3gpp_interface_type_t src_if_type; /* Source interface type 源接口类型*/
 
     union {
-        char *apn;
-        char *dnn;
-    };
+        char *apn; /* APN 接入点名称*/
+        char *dnn; /* DNN 域名*/
+    }; /* APN 接入点名称或者DNN域名，二选一*/
 
-    ogs_pfcp_ue_ip_addr_t   ue_ip_addr;
-    int                     ue_ip_addr_len;
+    ogs_pfcp_ue_ip_addr_t   ue_ip_addr; /* UE IP address 用户IP地址*/
+    int                     ue_ip_addr_len; /* UE IP address length 用户IP地址长度*/
 
-    char                    **ipv4_framed_routes;
-    char                    **ipv6_framed_routes;
+    char                    **ipv4_framed_routes; /* IPv4 framed routes IPv4帧路由*/
+    char                    **ipv6_framed_routes; /* IPv6 framed routes IPv6帧路由*/
 
-    ogs_pfcp_f_teid_t       f_teid;
-    int                     f_teid_len;
+    ogs_pfcp_f_teid_t       f_teid; /* F-TEID 转发TEID*/
+    int                     f_teid_len; /* F-TEID length 转发TEID长度*/
 
-    bool                    chid;
-    uint8_t                 choose_id;
+    bool                    chid; /* Chid 选择ID*/
+    uint8_t                 choose_id; /* Choose ID 选择ID*/
 
-    ogs_pfcp_outer_header_removal_t outer_header_removal;
-    int                     outer_header_removal_len;
+    ogs_pfcp_outer_header_removal_t outer_header_removal; /* Outer header removal 外头移除*/
+    int                     outer_header_removal_len; /* Outer header removal length 外头移除长度*/
 
-    uint8_t                 qfi;
+    uint8_t                 qfi; /* QFI 服务质量指示符*/
 
-    ogs_pfcp_far_t          *far;
+    ogs_pfcp_far_t          *far; /* FAR 转发规则*/
 
-    int                     num_of_urr;
-    ogs_pfcp_urr_t          *urr[OGS_MAX_NUM_OF_URR];
+    int                     num_of_urr; /* Number of URR 用户报告规则数量*/
+    ogs_pfcp_urr_t          *urr[OGS_MAX_NUM_OF_URR]; /* URR 用户报告规则*/
 
-    ogs_pfcp_qer_t          *qer;
+    ogs_pfcp_qer_t          *qer; /* QER 服务质量规则*/
 
-    int                     num_of_flow;
+    int                     num_of_flow; /* Number of flow 流数量*/
     struct {
         union {
             struct {
-    ED6(uint8_t     spare1:3;,
-        uint8_t     bid:1;,
-        uint8_t     fl:1;,
-        uint8_t     spi:1;,
-        uint8_t     ttc:1;,
-        uint8_t     fd:1;)
+    ED6(uint8_t     spare1:3;, /* Spare1 备用1*/
+        uint8_t     bid:1;, /* BID 业务ID*/
+        uint8_t     fl:1;, /* FL 转发方向*/
+        uint8_t     spi:1;, /* SPI 安全协议标识符*/
+        uint8_t     ttc:1;, /* TTC 传输类型代码*/
+        uint8_t     fd:1;) /* FD 转发方向*/
             };
-            uint8_t flags;
+            uint8_t flags; /* Flags 标志*/
         };
-        char *description;
-        uint32_t sdf_filter_id;
-    } flow[OGS_MAX_NUM_OF_FLOW_IN_PDR];;
+        char *description; /* Description 描述*/
+        uint32_t sdf_filter_id; /* SDF filter ID SDF过滤ID*/
+    } flow[OGS_MAX_NUM_OF_FLOW_IN_PDR]; /* Flow 流*/
 
-    ogs_list_t              rule_list;      /* Rule List */
+    ogs_list_t              rule_list;      /* Rule List 规则列表*/
 
     /* Related Context */
-    ogs_pfcp_sess_t         *sess;
-    void                    *gnode;         /* For CP-Function */
+    ogs_pfcp_sess_t         *sess; /* Session 会话*/
+    void                    *gnode;         /* For CP-Function 用于CP功能*/
 } ogs_pfcp_pdr_t;
 
 typedef struct ogs_pfcp_far_hash_f_teid_s {
-    uint32_t teid;
-    uint32_t addr[4];
+    uint32_t teid; /* TEID 基础TEID*/
+    uint32_t addr[4]; /* Address 地址*/
 } ogs_pfcp_far_hash_f_teid_t;
 
 typedef struct ogs_pfcp_far_s {
@@ -260,8 +260,8 @@ typedef struct ogs_pfcp_far_s {
 
     ogs_pfcp_smreq_flags_t  smreq_flags;
 
-    uint32_t                num_of_buffered_gtpu;
-    ogs_pkbuf_t             *buffered_gtpu[OGS_MAX_NUM_OF_GTPU_BUFFER];
+    uint32_t                num_of_buffered_packet;
+    ogs_pkbuf_t             *buffered_packet[OGS_MAX_NUM_OF_PACKET_BUFFER];
 
     struct {
         bool prepared;

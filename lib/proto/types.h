@@ -31,7 +31,7 @@ extern "C" {
 #define OGS_MAX_NUM_OF_SESS             4   /* Num of APN(Session) per UE */
 #define OGS_MAX_NUM_OF_BEARER           4   /* Num of Bearer per Session */
 #define OGS_BEARER_PER_UE               8   /* Num of Bearer per UE */
-#define OGS_MAX_NUM_OF_GTPU_BUFFER      64  /* Num of GTPU Buffer per UE */
+#define OGS_MAX_NUM_OF_PACKET_BUFFER    64  /* Num of PacketBuffer per UE */
 
 /*
  * TS24.008
@@ -193,7 +193,6 @@ extern "C" {
 #define OGS_SESSION_STRING "session"
 #define OGS_NAME_STRING "name"
 #define OGS_TYPE_STRING "type"
-#define OGS_LBO_ROAMING_ALLOWED_STRING "lbo_roaming_allowed"
 #define OGS_QOS_STRING "qos"
 #define OGS_INDEX_STRING "index"
 #define OGS_ARP_STRING "arp"
@@ -621,8 +620,6 @@ typedef struct ogs_session_s {
 #define OGS_PDU_SESSION_TYPE_TO_DIAMETER(x)         ((x)-1)
 #define OGS_PDU_SESSION_TYPE_FROM_DIAMETER(x)       ((x)+1)
     uint8_t session_type;
-
-    bool lbo_roaming_allowed; /* true: Allowed, false: Not allowed */
 
 #define OGS_SSC_MODE_1                              1
 #define OGS_SSC_MODE_2                              2

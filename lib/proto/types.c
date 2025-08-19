@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019-2024 by Sukchan Lee <acetcom@gmail.com>
+ * Copyright (C) 2019-2022 by Sukchan Lee <acetcom@gmail.com>
  *
  * This file is part of Open5GS.
  *
@@ -480,7 +480,7 @@ int ogs_pco_parse(ogs_pco_t *pco, unsigned char *data, int data_len)
         i++;
     }
     pco->num_of_id = i;
-    ogs_expect(size == data_len);
+    ogs_assert(size == data_len);
 
     return size;
 }

@@ -1,23 +1,5 @@
-/*
- * Copyright (C) 2019-2025 by Sukchan Lee <acetcom@gmail.com>
- *
- * This file is part of Open5GS.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 #include "ngap-path.h"
+#include "sbi-path.h"
 
 static amf_context_t self;
 
@@ -49,15 +31,18 @@ void amf_context_init(void)
     /* Initialize AMF context */
     memset(&self, 0, sizeof(amf_context_t));
 
+    //注册日志域
     ogs_log_install_domain(&__ogs_sctp_domain, "sctp", ogs_core()->log.level);
     ogs_log_install_domain(&__ogs_ngap_domain, "ngap", ogs_core()->log.level);
     ogs_log_install_domain(&__ogs_nas_domain, "nas", ogs_core()->log.level);
     ogs_log_install_domain(&__amf_log_domain, "amf", ogs_core()->log.level);
     ogs_log_install_domain(&__gmm_log_domain, "gmm", ogs_core()->log.level);
 
+    //初始化 IPv4 和 IPv6 的 gNB 连接列表。列表用于存储NGAP对象。
     ogs_list_init(&self.ngap_list);
     ogs_list_init(&self.ngap_list6);
 
+    //分配内存池
     /* Allocate TWICE the pool to check if maximum number of gNBs is reached */
     ogs_pool_init(&amf_gnb_pool, ogs_global_conf()->max.peer*2);
     ogs_pool_init(&amf_ue_pool, ogs_global_conf()->max.ue);
@@ -70,9 +55,19 @@ void amf_context_init(void)
     ogs_pool_assert_if_has_duplicate(&m_tmsi_pool);
 #endif
 
+    //初始化gNB和UE的全局链表
     ogs_list_init(&self.gnb_list);
     ogs_list_init(&self.amf_ue_list);
 
+    //哈希表创建
+    /**
+     * gnb_addr_hash key:gNB的IP
+     * gnb_id_hash key:gNB的ID
+     * guti_ue_hash key:GUTI
+     * suci_hash key:SUCI
+     * supi_hash key:SUPI
+     * 创建有唯一标识的终端或转发表时构造该类似哈希结构
+     * */
     self.gnb_addr_hash = ogs_hash_make();
     ogs_assert(self.gnb_addr_hash);
     self.gnb_id_hash = ogs_hash_make();
@@ -94,6 +89,7 @@ void amf_context_final(void)
     amf_gnb_remove_all();
     amf_ue_remove_all();
 
+    //释放哈希表
     ogs_assert(self.gnb_addr_hash);
     ogs_hash_destroy(self.gnb_addr_hash);
     ogs_assert(self.gnb_id_hash);
@@ -106,6 +102,7 @@ void amf_context_final(void)
     ogs_assert(self.supi_hash);
     ogs_hash_destroy(self.supi_hash);
 
+    //释放线程池
     ogs_pool_final(&m_tmsi_pool);
     ogs_pool_final(&amf_sess_pool);
     ogs_pool_final(&amf_ue_pool);
@@ -759,8 +756,8 @@ int amf_context_parse_config(void)
                                         s_nssai->sst = atoi(sst);
                                         if (sd)
                                             s_nssai->sd =
-                                                ogs_uint24_from_string_hexadecimal(
-                                                        (char*)sd);
+                                                ogs_uint24_from_string(
+                                                        (char*)sd, 16);
                                         else
                                             s_nssai->sd.v =
                                                 OGS_S_NSSAI_NO_SD_VALUE;
@@ -977,14 +974,12 @@ int amf_context_parse_config(void)
                                 ogs_yaml_iter_value(&network_name_iter);
                             uint8_t size = strlen(c_network_name);
                             uint8_t i;
-                            for (i = 0; i < size &&
-                                 (((i * 2) + 1) <
-                                  (OGS_NAS_MAX_NETWORK_NAME_LEN - 1));
-                                 i++) {
+                            for (i = 0;i<size;i++) {
                                 /* Workaround to convert the ASCII to USC-2 */
-                                network_full_name->name[i * 2] = 0;
-                                network_full_name->name[i * 2 + 1] =
+                                network_full_name->name[i*2] = 0;
+                                network_full_name->name[(i*2)+1] =
                                     c_network_name[i];
+
                             }
                             network_full_name->length = size*2+1;
                             network_full_name->coding_scheme = 1;
@@ -996,14 +991,12 @@ int amf_context_parse_config(void)
                                 ogs_yaml_iter_value(&network_name_iter);
                             uint8_t size = strlen(c_network_name);
                             uint8_t i;
-                            for (i = 0; i < size &&
-                                 (((i * 2) + 1) <
-                                  (OGS_NAS_MAX_NETWORK_NAME_LEN - 1));
-                                 i++) {
+                            for (i = 0;i<size;i++) {
                                 /* Workaround to convert the ASCII to USC-2 */
-                                network_short_name->name[i * 2] = 0;
-                                network_short_name->name[i * 2 + 1] =
+                                network_short_name->name[i*2] = 0;
+                                network_short_name->name[(i*2)+1] =
                                     c_network_name[i];
+
                             }
                             network_short_name->length = size*2+1;
                             network_short_name->coding_scheme = 1;
@@ -1108,20 +1101,16 @@ int amf_context_nf_info(void)
         nf_info = ogs_sbi_nf_info_add(
                 &nf_instance->nf_info_list, OpenAPI_nf_type_AMF);
         ogs_assert(nf_info);
-
-        nf_info->amf.amf_set_id =
-                ogs_amf_set_id(&self.served_guami[next_new_i].amf_id);
-        nf_info->amf.amf_region_id =
-                ogs_amf_region_id(&self.served_guami[next_new_i].amf_id);
-
+        nf_info->amf.amf_set_id = self.served_guami[next_new_i].amf_id.set2;
+        nf_info->amf.amf_region_id = self.served_guami[next_new_i].amf_id.region;
         next_found = false;
         info_i = 0;
         for (served_i = next_new_i; served_i <
                 self.num_of_served_guami; served_i++) {
-            if ((ogs_amf_set_id(&self.served_guami[served_i].amf_id) ==
-                    nf_info->amf.amf_set_id) &&
-                (ogs_amf_region_id(&self.served_guami[served_i].amf_id) ==
-                    nf_info->amf.amf_region_id)) {
+            if (self.served_guami[served_i].amf_id.set2 ==
+                    nf_info->amf.amf_set_id &&
+                    self.served_guami[served_i].amf_id.region ==
+                nf_info->amf.amf_region_id) {
                 nf_info->amf.guami[info_i] = self.served_guami[served_i];
                 nf_info->amf.num_of_guami++;
                 info_i++;
@@ -1129,25 +1118,21 @@ int amf_context_nf_info(void)
                 if (!next_found) {
                     int handled_i;
                     for (handled_i = 0; handled_i < served_i; handled_i++) {
-                        if ((ogs_amf_set_id(
-                                &self.served_guami[handled_i].amf_id) ==
-                             ogs_amf_set_id(
-                                &self.served_guami[served_i].amf_id)) &&
-                            (ogs_amf_region_id(
-                                &self.served_guami[handled_i].amf_id) ==
-                             ogs_amf_region_id(
-                                &self.served_guami[served_i].amf_id))) {
+                        if (self.served_guami[handled_i].amf_id.set2 ==
+                                self.served_guami[served_i].amf_id.set2 &&
+                            self.served_guami[handled_i].amf_id.region ==
+                                    self.served_guami[served_i].amf_id.region) {
                             break;
                         }
-                        next_found = true;
-                        next_new_i = served_i;
+                    next_found = true;
+                    next_new_i = served_i;
                     }
                 }
             }
         }
 
-
-        int i, j, k;
+        nf_info->amf.num_of_nr_tai = 0;
+        int i = 0, j = 0, k = 0, info_tai_i = 0;
         for (i = 0; i < self.num_of_served_tai; i++) {
             ogs_5gs_tai0_list_t *list0 = &self.served_tai[i].list0;
             ogs_5gs_tai1_list_t *list1 = &self.served_tai[i].list1;
@@ -1156,72 +1141,47 @@ int amf_context_nf_info(void)
             for (j = 0; list0->tai[j].num; j++) {
                 for (k = 0; k < list0->tai[j].num; k++) {
                     for (served_i = 0; served_i < info_i; served_i++) {
-                        if (nf_info->amf.num_of_nr_tai >= OGS_MAX_NUM_OF_TAI) {
-                            ogs_warn("Maximum number of TAI reached");
-                            break;
-                        }
-
                         if (ogs_plmn_id_hexdump(&list0->tai[j].plmn_id) ==
-                            ogs_plmn_id_hexdump(&nf_info->amf.guami[served_i].plmn_id)) {
-                            ogs_5gs_tai_t *tai =
-                                &nf_info->amf.nr_tai[
-                                    nf_info->amf.num_of_nr_tai];
-
-                            tai->plmn_id = list0->tai[j].plmn_id;
-                            tai->tac = list0->tai[j].tac[k];
-
+                                ogs_plmn_id_hexdump(
+                                    &nf_info->amf.guami[served_i].plmn_id)) {
+                            nf_info->amf.nr_tai[info_tai_i].plmn_id =
+                                    list0->tai[j].plmn_id;
+                            nf_info->amf.nr_tai[info_tai_i].tac =
+                                    list0->tai[j].tac[k];
                             nf_info->amf.num_of_nr_tai++;
+                            info_tai_i++;
                         }
                     }
                 }
             }
-
-
             for (j = 0; list1->tai[j].num; j++) {
-                for (served_i = 0; served_i < info_i; served_i++) {
-                    if (nf_info->amf.num_of_nr_tai_range >= OGS_MAX_NUM_OF_TAI) {
-                        ogs_warn("Maximum number of TAI range reached");
-                        break;
-                    }
-
-                    if (ogs_plmn_id_hexdump(&list1->tai[j].plmn_id) ==
-                        ogs_plmn_id_hexdump(&nf_info->amf.guami[served_i].plmn_id)) {
-                        nf_info->amf.nr_tai_range[
-                            nf_info->amf.num_of_nr_tai_range].plmn_id =
-                                list1->tai[j].plmn_id;
-                        nf_info->amf.nr_tai_range[
-                            nf_info->amf.num_of_nr_tai_range].start[0].v =
-                                list1->tai[j].tac.v;
-                        nf_info->amf.nr_tai_range[
-                            nf_info->amf.num_of_nr_tai_range].end[0].v =
-                                list1->tai[j].tac.v + list1->tai[j].num - 1;
-                        /* Supported is only 1 TAC range per TAI */
-                        nf_info->amf.nr_tai_range[
-                            nf_info->amf.num_of_nr_tai_range].num_of_tac_range = 1;
-
-                        nf_info->amf.num_of_nr_tai_range++;
+                for (k = 0; k < list1->tai[j].num; k++) {
+                    for (served_i = 0; served_i < info_i; served_i++) {
+                        if (ogs_plmn_id_hexdump(&list1->tai[j].plmn_id) ==
+                                ogs_plmn_id_hexdump(
+                                    &nf_info->amf.guami[served_i].plmn_id)) {
+                            nf_info->amf.nr_tai[info_tai_i].plmn_id =
+                                    list1->tai[j].plmn_id;
+                            nf_info->amf.nr_tai[info_tai_i].tac.v =
+                                    list1->tai[j].tac.v+k;
+                            nf_info->amf.num_of_nr_tai++;
+                            info_tai_i++;
+                        }
                     }
                 }
             }
-
             if (list2->num) {
                 for (j = 0; j < list2->num; j++) {
                     for (served_i = 0; served_i < info_i; served_i++) {
-                        if (nf_info->amf.num_of_nr_tai >= OGS_MAX_NUM_OF_TAI) {
-                            ogs_warn("Maximum number of TAI reached");
-                            break;
-                        }
-
                         if (ogs_plmn_id_hexdump(&list2->tai[j].plmn_id) ==
-                            ogs_plmn_id_hexdump(&nf_info->amf.guami[served_i].plmn_id)) {
-                            ogs_5gs_tai_t *tai =
-                                &nf_info->amf.nr_tai[
-                                    nf_info->amf.num_of_nr_tai];
-
-                            tai->plmn_id = list2->tai[j].plmn_id;
-                            tai->tac = list2->tai[j].tac;
-
+                                ogs_plmn_id_hexdump(
+                                    &nf_info->amf.guami[served_i].plmn_id)) {
+                            nf_info->amf.nr_tai[info_tai_i].plmn_id =
+                                    list2->tai[j].plmn_id;
+                            nf_info->amf.nr_tai[info_tai_i].tac =
+                                    list2->tai[j].tac;
                             nf_info->amf.num_of_nr_tai++;
+                            info_tai_i++;
                         }
                     }
                 }
@@ -1277,6 +1237,11 @@ amf_gnb_t *amf_gnb_add(ogs_sock_t *sock, ogs_sockaddr_t *addr)
     ogs_info("[Added] Number of gNBs is now %d",
             ogs_list_count(&self.gnb_list));
 
+    // 向DMF发送基站注册同步信息
+    char gnb_id_str[64];
+    snprintf(gnb_id_str, sizeof(gnb_id_str), "%u", gnb->gnb_id);
+    amf_sbi_send_gnb_sync_to_dmf(gnb_id_str, true);
+
     return gnb;
 }
 
@@ -1287,6 +1252,11 @@ void amf_gnb_remove(amf_gnb_t *gnb)
     ogs_assert(gnb);
     ogs_assert(gnb->sctp.sock);
 
+    // 向DMF发送基站去注册同步信息
+    char gnb_id_str[64];
+    snprintf(gnb_id_str, sizeof(gnb_id_str), "%u", gnb->gnb_id);
+    amf_sbi_send_gnb_sync_to_dmf(gnb_id_str, false);
+
     ogs_list_remove(&self.gnb_list, gnb);
 
     memset(&e, 0, sizeof(e));
@@ -1295,8 +1265,7 @@ void amf_gnb_remove(amf_gnb_t *gnb)
 
     ogs_hash_set(self.gnb_addr_hash,
             gnb->sctp.addr, sizeof(ogs_sockaddr_t), NULL);
-    if (gnb->gnb_id_presence == true)
-        ogs_hash_set(self.gnb_id_hash, &gnb->gnb_id, sizeof(gnb->gnb_id), NULL);
+    ogs_hash_set(self.gnb_id_hash, &gnb->gnb_id, sizeof(gnb->gnb_id), NULL);
 
     ogs_sctp_flush_and_destroy(&gnb->sctp);
 
@@ -1332,13 +1301,10 @@ int amf_gnb_set_gnb_id(amf_gnb_t *gnb, uint32_t gnb_id)
 {
     ogs_assert(gnb);
 
-    if (gnb->gnb_id_presence == true)
-        ogs_hash_set(self.gnb_id_hash, &gnb->gnb_id, sizeof(gnb->gnb_id), NULL);
+    ogs_hash_set(self.gnb_id_hash, &gnb->gnb_id, sizeof(gnb->gnb_id), NULL);
 
     gnb->gnb_id = gnb_id;
     ogs_hash_set(self.gnb_id_hash, &gnb->gnb_id, sizeof(gnb->gnb_id), gnb);
-
-    gnb->gnb_id_presence = true;
 
     return OGS_OK;
 }
@@ -1773,7 +1739,7 @@ void amf_ue_remove(amf_ue_t *amf_ue)
                 ogs_list_count(&amf_ue->sbi.xact_list));
     ogs_sbi_object_free(&amf_ue->sbi);
 
-    amf_ue->ran_ue_id = OGS_INVALID_POOL_ID;
+    amf_ue_deassociate(amf_ue);
 
     ogs_pool_id_free(&amf_ue_pool, amf_ue);
 
@@ -2231,16 +2197,16 @@ void amf_ue_associate_ran_ue(amf_ue_t *amf_ue, ran_ue_t *ran_ue)
     ran_ue->amf_ue_id = amf_ue->id;
 }
 
-void amf_ue_deassociate_ran_ue(amf_ue_t *amf_ue, ran_ue_t *ran_ue)
+void ran_ue_deassociate(ran_ue_t *ran_ue)
+{
+    ogs_assert(ran_ue);
+    ran_ue->amf_ue_id = OGS_INVALID_POOL_ID;
+}
+
+void amf_ue_deassociate(amf_ue_t *amf_ue)
 {
     ogs_assert(amf_ue);
-    ogs_assert(ran_ue);
-
-    if (amf_ue->ran_ue_id == ran_ue->id)
-        amf_ue->ran_ue_id = OGS_INVALID_POOL_ID;
-    else
-        ogs_error("Cannot deassociate amf_ue->ran_ue_id[%d] != ran_ue->id[%d]",
-                amf_ue->ran_ue_id, ran_ue->id);
+    amf_ue->ran_ue_id = OGS_INVALID_POOL_ID;
 }
 
 void source_ue_associate_target_ue(
@@ -2267,37 +2233,20 @@ void source_ue_deassociate_target_ue(ran_ue_t *ran_ue)
 
         ogs_assert(source_ue->target_ue_id >= OGS_MIN_POOL_ID &&
                 source_ue->target_ue_id <= OGS_MAX_POOL_ID);
+        ogs_assert(target_ue->source_ue_id >= OGS_MIN_POOL_ID &&
+                target_ue->source_ue_id <= OGS_MAX_POOL_ID);
         source_ue->target_ue_id = OGS_INVALID_POOL_ID;
-
-        if (target_ue) {
-            ogs_assert(target_ue->source_ue_id >= OGS_MIN_POOL_ID &&
-                    target_ue->source_ue_id <= OGS_MAX_POOL_ID);
-            target_ue->source_ue_id = OGS_INVALID_POOL_ID;
-        } else
-            ogs_error("Target-UE-ID [%d] has already been removed "
-                    "(RAN_UE_S1AP_ID[%lld] AMF_UE_S1AP_ID[%lld])",
-                    source_ue->target_ue_id,
-                    (long long)source_ue->ran_ue_ngap_id,
-                    (long long)source_ue->amf_ue_ngap_id);
-
+        target_ue->source_ue_id = OGS_INVALID_POOL_ID;
     } else if (ran_ue->source_ue_id >= OGS_MIN_POOL_ID &&
                 ran_ue->source_ue_id <= OGS_MAX_POOL_ID) {
         target_ue = ran_ue;
         source_ue = ran_ue_find_by_id(ran_ue->source_ue_id);
 
-        if (source_ue) {
-            ogs_assert(source_ue->target_ue_id >= OGS_MIN_POOL_ID &&
-                    source_ue->target_ue_id <= OGS_MAX_POOL_ID);
-            source_ue->target_ue_id = OGS_INVALID_POOL_ID;
-        } else
-            ogs_error("Source-UE-ID [%d] has already been removed "
-                    "(RAN_UE_S1AP_ID[%lld] AMF_UE_S1AP_ID[%lld])",
-                    target_ue->source_ue_id,
-                    (long long)target_ue->ran_ue_ngap_id,
-                    (long long)target_ue->amf_ue_ngap_id);
-
+        ogs_assert(source_ue->target_ue_id >= OGS_MIN_POOL_ID &&
+                source_ue->target_ue_id <= OGS_MAX_POOL_ID);
         ogs_assert(target_ue->source_ue_id >= OGS_MIN_POOL_ID &&
                 target_ue->source_ue_id <= OGS_MAX_POOL_ID);
+        source_ue->target_ue_id = OGS_INVALID_POOL_ID;
         target_ue->source_ue_id = OGS_INVALID_POOL_ID;
     }
 }
@@ -2319,7 +2268,6 @@ amf_sess_t *amf_sess_add(amf_ue_t *amf_ue, uint8_t psi)
 
     sess->s_nssai.sst = 0;
     sess->s_nssai.sd.v = OGS_S_NSSAI_NO_SD_VALUE;
-    sess->mapped_hplmn_presence = false;
     sess->mapped_hplmn.sst = 0;
     sess->mapped_hplmn.sd.v = OGS_S_NSSAI_NO_SD_VALUE;
 
@@ -2372,12 +2320,10 @@ void amf_sess_remove(amf_sess_t *sess)
 
     if (sess->nssf.nsi_id)
         ogs_free(sess->nssf.nsi_id);
-    if (sess->nssf.nrf_uri)
-        ogs_free(sess->nssf.nrf_uri);
+    if (sess->nssf.nrf.id)
+        ogs_free(sess->nssf.nrf.id);
     if (sess->nssf.nrf.client)
         ogs_sbi_client_remove(sess->nssf.nrf.client);
-    if (sess->nssf.hnrf_uri)
-        ogs_free(sess->nssf.hnrf_uri);
 
     ogs_pool_id_free(&amf_sess_pool, sess);
 
@@ -2412,6 +2358,53 @@ amf_ue_t *amf_ue_find_by_id(ogs_pool_id_t id)
 amf_sess_t *amf_sess_find_by_id(ogs_pool_id_t id)
 {
     return ogs_pool_find_by_id(&amf_sess_pool, id);
+}
+
+void amf_sbi_select_nf(
+        ogs_sbi_object_t *sbi_object,
+        ogs_sbi_service_type_e service_type,
+        OpenAPI_nf_type_e requester_nf_type,
+        ogs_sbi_discovery_option_t *discovery_option)
+{
+    OpenAPI_nf_type_e target_nf_type = OpenAPI_nf_type_NULL;
+    ogs_sbi_nf_instance_t *nf_instance = NULL;
+    amf_sess_t *sess = NULL;
+
+    ogs_assert(sbi_object);
+    ogs_assert(service_type);
+    target_nf_type = ogs_sbi_service_type_to_nf_type(service_type);
+    ogs_assert(target_nf_type);
+    ogs_assert(requester_nf_type);
+
+    switch(sbi_object->type) {
+    case OGS_SBI_OBJ_UE_TYPE:
+        nf_instance = ogs_sbi_nf_instance_find_by_discovery_param(
+                        target_nf_type, requester_nf_type, discovery_option);
+        if (nf_instance)
+            OGS_SBI_SETUP_NF_INSTANCE(
+                    sbi_object->service_type_array[service_type], nf_instance);
+        break;
+    case OGS_SBI_OBJ_SESS_TYPE:
+        sess = (amf_sess_t *)sbi_object;
+        ogs_assert(sess);
+
+        ogs_list_for_each(&ogs_sbi_self()->nf_instance_list, nf_instance) {
+            if (ogs_sbi_discovery_param_is_matched(
+                    nf_instance,
+                    target_nf_type, requester_nf_type, discovery_option) ==
+                        false)
+                continue;
+
+            OGS_SBI_SETUP_NF_INSTANCE(
+                    sbi_object->service_type_array[service_type], nf_instance);
+            break;
+        }
+        break;
+    default:
+        ogs_fatal("(NF discover search result) Not implemented [%d]",
+                    sbi_object->type);
+        ogs_assert_if_reached();
+    }
 }
 
 int amf_sess_xact_count(amf_ue_t *amf_ue)
@@ -2687,63 +2680,6 @@ uint8_t amf_selected_enc_algorithm(amf_ue_t *amf_ue)
     return 0;
 }
 
-/*
- * Save the sensitive (partial) context fields
- * from the UE context into the memento
- */
-void amf_ue_save_memento(amf_ue_t *amf_ue, amf_ue_memento_t *memento)
-{
-    ogs_assert(amf_ue);
-    ogs_assert(memento);
-
-    memcpy(&memento->ue_security_capability, &amf_ue->ue_security_capability,
-           sizeof(memento->ue_security_capability));
-    memcpy(&memento->ue_network_capability, &amf_ue->ue_network_capability,
-           sizeof(memento->ue_network_capability));
-    memcpy(memento->rand, amf_ue->rand, OGS_RAND_LEN);
-    memcpy(memento->autn, amf_ue->autn, OGS_AUTN_LEN);
-    memcpy(memento->xres_star, amf_ue->xres_star, OGS_MAX_RES_LEN);
-    memcpy(memento->abba, amf_ue->abba, OGS_NAS_MAX_ABBA_LEN);
-    memento->abba_len = amf_ue->abba_len;
-    memcpy(memento->hxres_star, amf_ue->hxres_star, OGS_MAX_RES_LEN);
-    memcpy(memento->kamf, amf_ue->kamf, OGS_SHA256_DIGEST_SIZE);
-    memcpy(memento->knas_int, amf_ue->knas_int, OGS_SHA256_DIGEST_SIZE/2);
-    memcpy(memento->knas_enc, amf_ue->knas_enc, OGS_SHA256_DIGEST_SIZE/2);
-    memento->dl_count = amf_ue->dl_count;
-    memento->ul_count = amf_ue->ul_count.i32;
-    memcpy(memento->kgnb, amf_ue->kgnb, OGS_SHA256_DIGEST_SIZE);
-    memcpy(memento->nh, amf_ue->nh, OGS_SHA256_DIGEST_SIZE);
-    memento->selected_enc_algorithm = amf_ue->selected_enc_algorithm;
-    memento->selected_int_algorithm = amf_ue->selected_int_algorithm;
-}
-
-/* Restore the sensitive context fields into the UE context */
-void amf_ue_restore_memento(amf_ue_t *amf_ue, const amf_ue_memento_t *memento)
-{
-    ogs_assert(amf_ue);
-    ogs_assert(memento);
-
-    memcpy(&amf_ue->ue_security_capability, &memento->ue_security_capability,
-           sizeof(amf_ue->ue_security_capability));
-    memcpy(&amf_ue->ue_network_capability, &memento->ue_network_capability,
-           sizeof(amf_ue->ue_network_capability));
-    memcpy(amf_ue->rand, memento->rand, OGS_RAND_LEN);
-    memcpy(amf_ue->autn, memento->autn, OGS_AUTN_LEN);
-    memcpy(amf_ue->xres_star, memento->xres_star, OGS_MAX_RES_LEN);
-    memcpy(amf_ue->abba, memento->abba, OGS_NAS_MAX_ABBA_LEN);
-    amf_ue->abba_len = memento->abba_len;
-    memcpy(amf_ue->hxres_star, memento->hxres_star, OGS_MAX_RES_LEN);
-    memcpy(amf_ue->kamf, memento->kamf, OGS_SHA256_DIGEST_SIZE);
-    memcpy(amf_ue->knas_int, memento->knas_int, OGS_SHA256_DIGEST_SIZE/2);
-    memcpy(amf_ue->knas_enc, memento->knas_enc, OGS_SHA256_DIGEST_SIZE/2);
-    amf_ue->dl_count = memento->dl_count;
-    amf_ue->ul_count.i32 = memento->ul_count;
-    memcpy(amf_ue->kgnb, memento->kgnb, OGS_SHA256_DIGEST_SIZE);
-    memcpy(amf_ue->nh, memento->nh, OGS_SHA256_DIGEST_SIZE);
-    amf_ue->selected_enc_algorithm = memento->selected_enc_algorithm;
-    amf_ue->selected_int_algorithm = memento->selected_int_algorithm;
-}
-
 void amf_clear_subscribed_info(amf_ue_t *amf_ue)
 {
     int i, j;
@@ -2954,12 +2890,6 @@ bool amf_update_allowed_nssai(amf_ue_t *amf_ue)
     amf_ue->rejected_nssai.num_of_s_nssai = 0;
 
     if (amf_ue->requested_nssai.num_of_s_nssai) {
-
-        if (amf_ue->num_of_slice == 0) {
-            ogs_error("[%s] No Slice in Subscription DB", amf_ue->supi);
-            return false;
-        }
-
         for (i = 0; i < amf_ue->requested_nssai.num_of_s_nssai; i++) {
             ogs_slice_data_t *slice = NULL;
             ogs_nas_s_nssai_ie_t *requested =
@@ -2972,6 +2902,7 @@ bool amf_update_allowed_nssai(amf_ue_t *amf_ue)
                         s_nssai[amf_ue->rejected_nssai.num_of_s_nssai];
             bool ta_supported = false;
 
+            ogs_assert(amf_ue->num_of_slice);
             slice = ogs_slice_find_by_s_nssai(
                     amf_ue->slice, amf_ue->num_of_slice,
                     (ogs_s_nssai_t *)requested);
@@ -2984,8 +2915,6 @@ bool amf_update_allowed_nssai(amf_ue_t *amf_ue)
 
                 allowed->sst = requested->sst;
                 allowed->sd.v = requested->sd.v;
-                allowed->mapped_hplmn_sst_presence =
-                        requested->mapped_hplmn_sst_presence;
                 allowed->mapped_hplmn_sst = requested->mapped_hplmn_sst;
                 allowed->mapped_hplmn_sd.v = requested->mapped_hplmn_sd.v;
 
@@ -3022,7 +2951,6 @@ bool amf_update_allowed_nssai(amf_ue_t *amf_ue)
 
                 allowed->sst = slice->s_nssai.sst;
                 allowed->sd.v = slice->s_nssai.sd.v;
-                allowed->mapped_hplmn_sst_presence = false;
                 allowed->mapped_hplmn_sst = 0;
                 allowed->mapped_hplmn_sd.v = OGS_S_NSSAI_NO_SD_VALUE;
 
@@ -3135,4 +3063,20 @@ void amf_ue_save_to_release_session_list(amf_ue_t *amf_ue)
             OpenAPI_list_add(amf_ue->to_release_session_list, psi);
         }
     }
+}
+
+void amf_ue_save_memento(amf_ue_t *amf_ue, struct amf_ue_memento_s *memento)
+{
+    // TODO: 实现保存 UE 上下文到 memento
+    // 暂时为空实现，避免链接错误
+    (void)amf_ue;
+    (void)memento;
+}
+
+void amf_ue_restore_memento(amf_ue_t *amf_ue, const struct amf_ue_memento_s *memento)
+{
+    // TODO: 实现从 memento 恢复 UE 上下文
+    // 暂时为空实现，避免链接错误
+    (void)amf_ue;
+    (void)memento;
 }

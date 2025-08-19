@@ -60,8 +60,8 @@ void ogs_app_config_final(void)
 
 static void recalculate_pool_size(void)
 {
-    ogs_app()->pool.gtpu =
-        global_conf.max.ue * OGS_MAX_NUM_OF_GTPU_BUFFER;
+    ogs_app()->pool.packet =
+        global_conf.max.ue * OGS_MAX_NUM_OF_PACKET_BUFFER;
 
 #define MAX_NUM_OF_TUNNEL       3   /* Num of Tunnel per Bearer */
     ogs_app()->pool.sess = global_conf.max.ue * OGS_MAX_NUM_OF_SESS;
@@ -1310,7 +1310,7 @@ ogs_app_policy_conf_t *ogs_app_policy_conf_add(
 }
 
 ogs_app_policy_conf_t *ogs_app_policy_conf_find(
-        const char *supi, const ogs_plmn_id_t *plmn_id)
+        char *supi, ogs_plmn_id_t *plmn_id)
 {
     ogs_app_policy_conf_t *policy_conf;
     int i;
@@ -1386,7 +1386,7 @@ void ogs_app_policy_conf_remove_all(void)
 }
 
 ogs_app_slice_conf_t *ogs_app_slice_conf_add(
-        ogs_app_policy_conf_t *policy_conf, const ogs_s_nssai_t *s_nssai)
+        ogs_app_policy_conf_t *policy_conf, ogs_s_nssai_t *s_nssai)
 {
     ogs_app_slice_conf_t *slice_conf = NULL;
 
@@ -1416,7 +1416,7 @@ ogs_app_slice_conf_t *ogs_app_slice_conf_add(
 }
 
 ogs_app_slice_conf_t *ogs_app_slice_conf_find_by_s_nssai(
-        ogs_app_policy_conf_t *policy_conf, const ogs_s_nssai_t *s_nssai)
+        ogs_app_policy_conf_t *policy_conf, ogs_s_nssai_t *s_nssai)
 {
     ogs_app_slice_conf_t *slice_conf = NULL;
 
@@ -1486,7 +1486,7 @@ int ogs_app_check_policy_conf(void)
 }
 
 ogs_app_session_conf_t *ogs_app_session_conf_add(
-        ogs_app_slice_conf_t *slice_conf, const char *name)
+        ogs_app_slice_conf_t *slice_conf, char *name)
 {
     ogs_app_session_conf_t *session_conf = NULL;
 
@@ -1518,7 +1518,7 @@ ogs_app_session_conf_t *ogs_app_session_conf_add(
     return session_conf;
 }
 ogs_app_session_conf_t *ogs_app_session_conf_find_by_dnn(
-        ogs_app_slice_conf_t *slice_conf, const char *name)
+        ogs_app_slice_conf_t *slice_conf, char *name)
 {
     ogs_app_session_conf_t *session_conf = NULL;
 
@@ -1561,8 +1561,7 @@ void ogs_app_session_conf_remove_all(ogs_app_slice_conf_t *slice_conf)
 }
 
 int ogs_app_config_session_data(
-        const char *supi, const ogs_plmn_id_t *plmn_id,
-        const ogs_s_nssai_t *s_nssai, const char *dnn,
+        char *supi, ogs_plmn_id_t *plmn_id, ogs_s_nssai_t *s_nssai, char *dnn,
         ogs_session_data_t *session_data)
 {
     ogs_app_policy_conf_t *policy_conf = NULL;

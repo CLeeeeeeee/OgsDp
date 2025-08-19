@@ -560,8 +560,19 @@ void sgwc_s11_handle_modify_bearer_request(
         ogs_assert(pdr);
 
         pdr->outer_header_removal_len = 1;
-        pdr->outer_header_removal.description =
-            OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+        if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV4) {
+            pdr->outer_header_removal.description =
+                OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV4;
+        } else if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV6) {
+            pdr->outer_header_removal.description =
+                OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV6;
+        } else if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV4V6) {
+            pdr->outer_header_removal.description =
+                OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+        } else {
+            ogs_error("Invalid session_type [%d]", sess->session.session_type);
+            ogs_assert_if_reached();
+        }
 
         far = dl_tunnel->far;
         ogs_assert(far);
@@ -927,8 +938,20 @@ void sgwc_s11_handle_create_bearer_response(
     ogs_assert(pdr);
 
     pdr->outer_header_removal_len = 1;
-    pdr->outer_header_removal.description =
-        OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+    if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV4) {
+        pdr->outer_header_removal.description =
+            OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV4;
+    } else if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV6) {
+        pdr->outer_header_removal.description =
+            OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV6;
+    } else if (sess->session.session_type ==
+            OGS_PDU_SESSION_TYPE_IPV4V6) {
+        pdr->outer_header_removal.description =
+            OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+    } else {
+        ogs_error("Invalid session_type [%d]", sess->session.session_type);
+        ogs_assert_if_reached();
+    }
 
     far = dl_tunnel->far;
     ogs_assert(far);
@@ -1438,8 +1461,21 @@ void sgwc_s11_handle_create_indirect_data_forwarding_tunnel_request(
             ogs_assert(pdr);
 
             pdr->outer_header_removal_len = 1;
-            pdr->outer_header_removal.description =
-                OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+            if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV4) {
+                pdr->outer_header_removal.description =
+                    OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV4;
+            } else if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV6) {
+                pdr->outer_header_removal.description =
+                    OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV6;
+            } else if (sess->session.session_type ==
+                    OGS_PDU_SESSION_TYPE_IPV4V6) {
+                pdr->outer_header_removal.description =
+                    OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+            } else {
+                ogs_error("Invalid session_type [%d]",
+                        sess->session.session_type);
+                ogs_assert_if_reached();
+            }
 
             far = tunnel->far;
             ogs_assert(far);
@@ -1480,8 +1516,21 @@ void sgwc_s11_handle_create_indirect_data_forwarding_tunnel_request(
             ogs_assert(pdr);
 
             pdr->outer_header_removal_len = 1;
-            pdr->outer_header_removal.description =
-                OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+            if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV4) {
+                pdr->outer_header_removal.description =
+                    OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV4;
+            } else if (sess->session.session_type == OGS_PDU_SESSION_TYPE_IPV6) {
+                pdr->outer_header_removal.description =
+                    OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IPV6;
+            } else if (sess->session.session_type ==
+                    OGS_PDU_SESSION_TYPE_IPV4V6) {
+                pdr->outer_header_removal.description =
+                    OGS_PFCP_OUTER_HEADER_REMOVAL_GTPU_UDP_IP;
+            } else {
+                ogs_error("Invalid session_type [%d]",
+                        sess->session.session_type);
+                ogs_assert_if_reached();
+            }
 
             far = tunnel->far;
             ogs_assert(far);

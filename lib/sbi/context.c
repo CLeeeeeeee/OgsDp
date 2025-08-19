@@ -1371,9 +1371,6 @@ void ogs_sbi_nf_instance_remove(ogs_sbi_nf_instance_t *nf_instance)
         ogs_free(nf_instance->id);
     }
 
-    if (nf_instance->hnrf_uri)
-        ogs_free(nf_instance->hnrf_uri);
-
     if (nf_instance->client)
         ogs_sbi_client_remove(nf_instance->client);
 
@@ -2155,11 +2152,6 @@ bool ogs_sbi_discovery_option_is_matched(
             return false;
     }
 
-    if (nf_instance->nf_type == OpenAPI_nf_type_NRF &&
-            ogs_sbi_discovery_option_hnrf_uri_is_matched(
-                nf_instance, discovery_option) == false)
-        return false;
-
     ogs_list_for_each(&nf_instance->nf_info_list, nf_info) {
         if (nf_instance->nf_type != nf_info->nf_type) {
             ogs_error("Invalid NF-Type [%d:%d]",
@@ -2290,23 +2282,6 @@ bool ogs_sbi_discovery_option_target_plmn_list_is_matched(
         }
     }
     return false;
-}
-
-bool ogs_sbi_discovery_option_hnrf_uri_is_matched(
-        ogs_sbi_nf_instance_t *nf_instance,
-        ogs_sbi_discovery_option_t *discovery_option)
-{
-    ogs_assert(nf_instance);
-    ogs_assert(discovery_option);
-
-    if (nf_instance->hnrf_uri == NULL && discovery_option->hnrf_uri == NULL)
-        return true;
-    else if (nf_instance->hnrf_uri == NULL ||
-            discovery_option->hnrf_uri == NULL)
-        return false;
-
-    return ogs_strcasecmp(nf_instance->hnrf_uri,
-            discovery_option->hnrf_uri) == 0;
 }
 
 bool ogs_sbi_discovery_param_is_matched(
@@ -2473,8 +2448,6 @@ void ogs_sbi_object_free(ogs_sbi_object_t *sbi_object)
         if (sbi_object->nf_type_array[i].nf_instance_id)
             ogs_free(sbi_object->nf_type_array[i].nf_instance_id);
     }
-    if (sbi_object->home_nsmf_pdusession.nf_instance_id)
-        ogs_free(sbi_object->home_nsmf_pdusession.nf_instance_id);
 }
 
 ogs_sbi_xact_t *ogs_sbi_xact_add(

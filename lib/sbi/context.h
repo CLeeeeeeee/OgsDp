@@ -1,21 +1,3 @@
-/*
- * Copyright (C) 2019-2025 by Sukchan Lee <acetcom@gmail.com>
- *
- * This file is part of Open5GS.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 
 #if !defined(OGS_SBI_INSIDE) && !defined(OGS_SBI_COMPILATION)
 #error "This header cannot be included directly."
@@ -28,6 +10,7 @@
 extern "C" {
 #endif
 
+    //最大 NF 类型的数量（最多支持8种类型，每种类型一个 info 结构）
 #define OGS_MAX_NUM_OF_NF_INFO 8
 #define OGS_MAX_NUM_OF_SCP_DOMAIN 8
 
@@ -36,34 +19,47 @@ typedef struct ogs_sbi_smf_info_s ogs_sbi_smf_info_t;
 typedef struct ogs_sbi_nf_instance_s ogs_sbi_nf_instance_t;
 
 typedef enum {
+    OGS_SBI_DISCOVERY_DELEGATED_AUTO = 0,
+    OGS_SBI_DISCOVERY_DELEGATED_YES,
+    OGS_SBI_DISCOVERY_DELEGATED_NO,
+} ogs_sbi_discovery_delegated_mode;
+
+typedef enum {
     OGS_SBI_CLIENT_DELEGATED_AUTO = 0,
     OGS_SBI_CLIENT_DELEGATED_YES,
     OGS_SBI_CLIENT_DELEGATED_NO,
 } ogs_sbi_client_delegated_mode_e;
 
-/* To hold all delegated config under sbi.client.delegated */
-typedef struct ogs_sbi_client_delegated_config_s {
-    struct {
-        ogs_sbi_client_delegated_mode_e nfm;  /* e.g. Registration, Heartbeat */
-        ogs_sbi_client_delegated_mode_e disc; /* NF discovery */
-    } nrf;
-    struct {
-        ogs_sbi_client_delegated_mode_e next; /* Next-hop SCP delegation */
-    } scp;
-} ogs_sbi_client_delegated_config_t;
+typedef struct ogs_sbi_discovery_config_s {
+    ogs_sbi_discovery_delegated_mode delegated;
+    bool no_service_names;
+    bool prefer_requester_nf_instance_id;
+} ogs_sbi_discovery_config_t;
 
 typedef struct ogs_sbi_context_s {
-    /* For sbi.client.delegated */
-    ogs_sbi_client_delegated_config_t client_delegated_config;
+    ogs_sbi_discovery_config_t discovery_config; /* SCP Discovery Delegated */
+
+    //???????????hou gai??????
+    struct {
+        struct {
+            ogs_sbi_client_delegated_mode_e nfm;
+            ogs_sbi_client_delegated_mode_e disc;
+        } nrf;
+        struct {
+            ogs_sbi_client_delegated_mode_e next;
+        } scp;
+    } client_delegated_config;
 
 #define OGS_HOME_NETWORK_PKI_VALUE_MIN 1
 #define OGS_HOME_NETWORK_PKI_VALUE_MAX 254
 
+//如果在 DMF 中加入私钥认证、签名、或设备安全性校验，可能会使用这部分逻辑。
     struct {
         uint8_t avail;
         uint8_t scheme;
         uint8_t key[OGS_ECCKEY_LEN]; /* 32 bytes Private Key */
     } hnet[OGS_HOME_NETWORK_PKI_VALUE_MAX+1]; /* PKI Value : 1 ~ 254 */
+
 
     struct {
         struct {
@@ -73,13 +69,13 @@ typedef struct ogs_sbi_context_s {
             const char *cert;
             const char *sslkeylog;
 
-            bool verify_client;
+            bool verify_client;   //双向验证
             const char *verify_client_cacert;
         } server;
         struct {
             OpenAPI_uri_scheme_e scheme;
 
-            bool insecure_skip_verify;
+            bool insecure_skip_verify;  //测试时可以开启
             const char *cacert;
 
             const char *private_key;
@@ -88,16 +84,14 @@ typedef struct ogs_sbi_context_s {
         } client;
     } tls;
 
-    const char *local_if;
-
     ogs_list_t server_list;
     ogs_list_t client_list;
 
-    ogs_uuid_t uuid;
+    ogs_uuid_t uuid;  //NF的全局唯一标识，注册时发给NRF的ID
 
     ogs_list_t nf_instance_list;
-    ogs_list_t subscription_spec_list;
-    ogs_list_t subscription_data_list;
+    ogs_list_t subscription_spec_list;//自己想要订阅哪些 NF 的服务
+    ogs_list_t subscription_data_list;//实际已注册的订阅数据
 
     ogs_sbi_nf_instance_t *nf_instance;     /* SELF NF Instance */
     ogs_sbi_nf_instance_t *nrf_instance;    /* NRF Instance */
@@ -108,35 +102,24 @@ typedef struct ogs_sbi_context_s {
 
     int num_of_service_name;
     const char *service_name[OGS_SBI_MAX_NUM_OF_SERVICE_TYPE];
+    const char *local_if;
 } ogs_sbi_context_t;
 
 typedef struct ogs_sbi_nf_instance_s {
     ogs_lnode_t lnode;
 
-    ogs_fsm_t sm;                           /* A state machine */
+    ogs_fsm_t sm;                           /* A state machine 状态机结构 */
     ogs_timer_t *t_registration_interval;   /* timer to retry
                                                to register peer node */
     struct {
-        int heartbeat_interval;
-        int validity_duration;
+        int heartbeat_interval;//NRF 要求的心跳周期。
+        int validity_duration;//注册信息的有效时长（如 60s、300s）。
     } time;
 
     ogs_timer_t *t_heartbeat_interval;      /* heartbeat interval */
     ogs_timer_t *t_no_heartbeat;            /* check heartbeat */
-    ogs_timer_t *t_validity;                /* check validation */
+    ogs_timer_t *t_validity;                /* check validation 定时刷新注册或注销。 */
 
-    /*
-     * Issues #2034
-     *
-     * Other NF instances are obtained through NRF
-     * or created directly through configuration files.
-     *
-     * Other NFs created by the config file should not be passed
-     * through NRF discovery or anything like that.
-     *
-     * Since self-created NF Instances do not have an ID,
-     * they are implemented to exclude them from NRF Discovery.
-     */
 #define NF_INSTANCE_EXCLUDED_FROM_DISCOVERY(__nFInstance) \
     (!(__nFInstance) || !((__nFInstance)->id))
 
@@ -148,31 +131,33 @@ typedef struct ogs_sbi_nf_instance_s {
 #define NF_INSTANCE_ID_IS_OTHERS(_iD) \
     (_iD) && ogs_sbi_self()->nf_instance && \
         strcmp((_iD), ogs_sbi_self()->nf_instance->id) != 0
-    char *id;
+    char *id; //NF 实例的全局唯一 ID（UUID），用于注册与发现。
 
 #define NF_INSTANCE_TYPE(__nFInstance) \
     ((__nFInstance) ? ((__nFInstance)->nf_type) : OpenAPI_nf_type_NULL)
 #define NF_INSTANCE_TYPE_IS_NRF(__nFInstance) \
     (NF_INSTANCE_TYPE(__nFInstance) == OpenAPI_nf_type_NRF)
-    OpenAPI_nf_type_e nf_type;
-    OpenAPI_nf_status_e nf_status;
+    OpenAPI_nf_type_e nf_type;//如 AMF、SMF
+    OpenAPI_nf_status_e nf_status;//注册状态
 
+    //表示该 NF 实例在哪些运营区域提供服务
     ogs_plmn_id_t plmn_id[OGS_MAX_NUM_OF_PLMN];
     int num_of_plmn_id;
 
-    char *fqdn;
-    char *hnrf_uri; /* NRF Only */
-
+    char *fqdn; //服务注册到 NRF 后生成的服务名称
+    //SBI 接口地址 将来让 DMF 在注册时写入这些信息，其他模块就能用它的 SBI 地址访问它
 #define OGS_SBI_MAX_NUM_OF_IP_ADDRESS 8
     int num_of_ipv4;
     ogs_sockaddr_t *ipv4[OGS_SBI_MAX_NUM_OF_IP_ADDRESS];
     int num_of_ipv6;
     ogs_sockaddr_t *ipv6[OGS_SBI_MAX_NUM_OF_IP_ADDRESS];
 
+    //NF 访问权限控制 你可以让 DMF 只允许 AMF 发请求，其他 NF 都不行。
     int num_of_allowed_nf_type;
 #define OGS_SBI_MAX_NUM_OF_NF_TYPE 128
     OpenAPI_nf_type_e allowed_nf_type[OGS_SBI_MAX_NUM_OF_NF_TYPE];
 
+    //服务负载与优先级信息
 #define OGS_SBI_DEFAULT_PRIORITY 0
 #define OGS_SBI_DEFAULT_CAPACITY 100
 #define OGS_SBI_DEFAULT_LOAD 0
@@ -180,9 +165,11 @@ typedef struct ogs_sbi_nf_instance_s {
     int capacity;
     int load;
 
+    //服务与信息列表 这个 NF 提供的 SBI 服务 如 nsmf-pdusession，你未来可提供 ndmf-upload 等
     ogs_list_t nf_service_list;
     ogs_list_t nf_info_list;
 
+    //客户端指针（仅用于 SBI client）
 #define NF_INSTANCE_CLIENT(__nFInstance) \
     ((__nFInstance) ? ((__nFInstance)->client) : NULL)
     void *client;                       /* only used in CLIENT */
@@ -190,22 +177,20 @@ typedef struct ogs_sbi_nf_instance_s {
 
 typedef enum {
     OGS_SBI_OBJ_BASE = 0,
-
     OGS_SBI_OBJ_UE_TYPE,
     OGS_SBI_OBJ_SESS_TYPE,
-
     OGS_SBI_OBJ_TOP,
 } ogs_sbi_obj_type_e;
 
+//用于维护特定类型服务发现与交互上下文
 typedef struct ogs_sbi_object_s {
     ogs_lnode_t lnode;
 
     ogs_sbi_obj_type_e type;
 
     struct {
+        ogs_sbi_nf_instance_t *nf_instance;
         char *nf_instance_id;
-
-#if ENABLE_VALIDITY_TIMEOUT
         /*
          * Search.Result stored in nf_instance->time.validity_duration;
          *
@@ -215,10 +200,8 @@ typedef struct ogs_sbi_object_s {
          * if no validityPeriod in SearchResult, validity_timeout is 0.
          */
         ogs_time_t validity_timeout;
-#endif
-      } nf_type_array[OGS_SBI_MAX_NUM_OF_NF_TYPE],
-        service_type_array[OGS_SBI_MAX_NUM_OF_SERVICE_TYPE],
-        home_nsmf_pdusession;
+    } nf_type_array[OGS_SBI_MAX_NUM_OF_NF_TYPE],
+      service_type_array[OGS_SBI_MAX_NUM_OF_SERVICE_TYPE];
 
     ogs_list_t xact_list;
 
@@ -227,42 +210,14 @@ typedef struct ogs_sbi_object_s {
 typedef ogs_sbi_request_t *(*ogs_sbi_build_f)(
         void *context, void *data);
 
-#define OGS_SBI_XACT_LOG(xact) \
-    do { \
-        ogs_error("    requester-nf-type[%s:%d]", \
-                OpenAPI_nf_type_ToString((xact)->requester_nf_type), \
-                (xact)->requester_nf_type); \
-        ogs_error("    service-name[%s:%d]", \
-                ogs_sbi_service_type_to_name((xact)->service_type), \
-                (xact)->service_type); \
-        if ((xact)->request) { \
-            int i; \
-            ogs_sbi_request_t *request = (xact)->request; \
-            if (request->h.method) \
-                ogs_error("    h.method[%s]", request->h.method); \
-            if (request->h.uri) \
-                ogs_error("    h.uri[%s]", request->h.uri); \
-            if (request->h.service.name) \
-                ogs_error("    h.service.name[%s]", request->h.service.name); \
-            if (request->h.api.version) \
-                ogs_error("    h.api.version[%s]", request->h.api.version); \
-            for (i = 0; i < OGS_SBI_MAX_NUM_OF_RESOURCE_COMPONENT && \
-                        request->h.resource.component[i]; i++)  \
-                ogs_error("    h.resource.component[%s:%d]", \
-                        request->h.resource.component[i], i); \
-            ogs_error("    http.content_length[%d]", \
-                    (int)request->http.content_length); \
-            if (request->http.content) \
-                ogs_error("    http.content[%s]", request->http.content); \
-        } \
-    } while(0)
+
 typedef struct ogs_sbi_xact_s {
     ogs_lnode_t lnode;
 
     ogs_pool_id_t id;
 
     ogs_sbi_service_type_e service_type;
-    OpenAPI_nf_type_e requester_nf_type;
+    OpenAPI_nf_type_e requester_nf_type;//发起该事务的 NF 类型
     ogs_sbi_discovery_option_t *discovery_option;
 
     ogs_sbi_request_t *request;
@@ -271,11 +226,13 @@ typedef struct ogs_sbi_xact_s {
     ogs_pool_id_t assoc_stream_id;
 
     int state;
-    char *target_apiroot;
+    char *target_apiroot;//目标 NF 的 API 根路径 在发送请求时会构造完整的 URL：target_apiroot + URI path
 
     ogs_sbi_object_t *sbi_object;
     ogs_pool_id_t sbi_object_id;
 } ogs_sbi_xact_t;
+
+#define OGS_SBI_XACT_LOG(x)
 
 typedef struct ogs_sbi_nf_service_s {
     ogs_lnode_t lnode;
@@ -311,45 +268,47 @@ typedef struct ogs_sbi_nf_service_s {
     int load;
 
     /* Related Context */
-    ogs_sbi_nf_instance_t *nf_instance;
+    ogs_sbi_nf_instance_t *nf_instance;//哪个 NF 实例提供了这个服务
     void *client;
 } ogs_sbi_nf_service_t;
 
+//订阅意图说明（spec），表示“我想订阅哪类服务”
 typedef struct ogs_sbi_subscription_spec_s {
     ogs_lnode_t lnode;
 
     struct {
-        OpenAPI_nf_type_e nf_type;          /* nfType */
-        char *service_name;                 /* ServiceName */
-    } subscr_cond;
+        OpenAPI_nf_type_e nf_type;          /* nfType希望订阅的目标 NF 类型 */
+        char *service_name;                 /* ServiceName目标 NF 提供的服务名 */
+        char *nf_instance_id;
+    } subscr_cond;//我希望订阅谁的什么
 
-} ogs_sbi_subscription_spec_t;
+} ogs_sbi_subscription_spec_t;//本地意愿，不一定代表已经注册成功的订阅
 
-typedef struct ogs_sbi_subscription_data_s {
+typedef struct ogs_sbi_subscription_data_s {//实际已经注册到 NRF 的订阅项
     ogs_lnode_t lnode;
 
-    ogs_time_t validity_duration;           /* valditiyTime(unit: usec) */
-    ogs_timer_t *t_validity;                /* check validation */
-    ogs_timer_t *t_patch;                   /* for sending PATCH */
+    ogs_time_t validity_duration;           /* valditiyTime(unit: usec)有效期 */
+    ogs_timer_t *t_validity;                /* check validation定期检查是否订阅已经过期的定时器 */
+    ogs_timer_t *t_patch;                   /* for sending PATCH周期性 PATCH 订阅状态或延长订阅有效期的定时器 */
 
     char *id;                               /* SubscriptionId */
-    char *req_nf_instance_id;               /* reqNfInstanceId */
-    OpenAPI_nf_type_e req_nf_type;          /* reqNfType */
+    char *req_nf_instance_id;               /* reqNfInstanceId 本地 NF 的实例 ID*/
+    OpenAPI_nf_type_e req_nf_type;          /* reqNfType 本地 NF 的类型*/
     OpenAPI_nf_status_e nf_status;
-    char *notification_uri;
+    char *notification_uri;//当 NRF 检测到被订阅的目标 NF 有状态变更时，会向该 URI 发送通知消息 DMF实现时需监听该URI
     char *resource_uri;
 
     struct {
         OpenAPI_nf_type_e nf_type;          /* nfType */
         char *service_name;                 /* ServiceName */
-        char *nf_instance_id;               /* NF Instance Id */
+        char *nf_instance_id;
     } subscr_cond;
 
     uint64_t requester_features;
     uint64_t nrf_supported_features;
 
     void *client;
-} ogs_sbi_subscription_data_t;
+} ogs_sbi_subscription_data_t;//“我已经订阅成功了”的记录
 
 typedef struct ogs_sbi_smf_info_s {
     int num_of_slice;
@@ -393,17 +352,29 @@ typedef struct ogs_sbi_sepp_info_s {
     ogs_port_t http, https;
 } ogs_sbi_sepp_info_t;
 
-typedef struct ogs_sbi_amf_info_s {
-    uint16_t amf_set_id;
-    uint8_t amf_region_id;
+typedef struct ogs_sbi_dmf_info_s {
+    // DMF特定的信息结构
+    // 可以根据需要添加DMF特有的字段
+    int num_of_gnb;
+    char *gnb_list[OGS_MAX_NUM_OF_TAI]; // 简化的gNB列表
+} ogs_sbi_dmf_info_t;
 
+typedef struct ogs_sbi_amf_info_s {
+    uint8_t amf_set_id;//所属 AMF Set 的 ID（用于 UE 寻址和重定位）
+    uint16_t amf_region_id;//所在的 AMF Region 区域 ID，用于位置选择
+
+    //AMF 支持的 GUAMI 列表（全球唯一 AMF 标识，组合了 PLMN 和 AMF ID）
     int num_of_guami;
     ogs_guami_t guami[OGS_MAX_NUM_OF_SERVED_GUAMI];
 
+    //支持的 TAI（5G Tracking Area Identity），用于区域服务能力表示。
     int num_of_nr_tai;
     ogs_5gs_tai_t nr_tai[OGS_MAX_NUM_OF_TAI];
 
+    //NR TAI 范围数量。
     int num_of_nr_tai_range;
+
+    //与 smf_info 一样，每个范围对应的运营商 PLMN。
     struct {
         ogs_plmn_id_t plmn_id;
         /*
@@ -420,13 +391,15 @@ typedef struct ogs_sbi_amf_info_s {
 typedef struct ogs_sbi_nf_info_s {
     ogs_lnode_t lnode;
 
-    OpenAPI_nf_type_e nf_type;
+    OpenAPI_nf_type_e nf_type; //这个字段用来选择 union 中具体哪一块数据有效。
     union {
         ogs_sbi_smf_info_t smf;
         ogs_sbi_amf_info_t amf;
         ogs_sbi_scp_info_t scp;
         ogs_sbi_sepp_info_t sepp;
-    };
+        ogs_sbi_dmf_info_t dmf;
+    };//指明本结构体描述的是哪种 NF 类型
+
 } ogs_sbi_nf_info_t;
 
 void ogs_sbi_context_init(OpenAPI_nf_type_e nf_type);
@@ -511,77 +484,49 @@ void ogs_sbi_client_associate(ogs_sbi_nf_instance_t *nf_instance);
 
 int ogs_sbi_default_client_port(OpenAPI_uri_scheme_e scheme);
 
-#if ENABLE_VALIDITY_TIMEOUT
 #define OGS_SBI_SETUP_NF_INSTANCE(__cTX, __nFInstance) \
     do { \
         ogs_assert(__nFInstance); \
         ogs_assert((__nFInstance)->id); \
-        ogs_assert((__nFInstance)->nf_type); \
         ogs_assert((__nFInstance)->t_validity); \
         \
-        if ((__cTX).nf_instance_id) { \
-            ogs_warn("[%s] Unlink NF Instance " \
-                    "[type:%s validity:%d timeout:%lds]", \
-                    ((__cTX).nf_instance_id), \
-                    OpenAPI_nf_type_ToString((__nFInstance)->nf_type), \
-                    (__nFInstance)->time.validity_duration, \
-                    (long)((__cTX).validity_timeout)); \
-            ogs_free((__cTX).nf_instance_id); \
+        if ((__cTX).nf_instance) { \
+            ogs_warn("[%s] NF Instance updated [type:%s validity:%ds]", \
+                    ((__cTX).nf_instance)->id, \
+                    OpenAPI_nf_type_ToString(((__cTX).nf_instance)->nf_type), \
+                    ((__cTX).nf_instance)->time.validity_duration); \
         } \
         \
-        ((__cTX).nf_instance_id) = ogs_strdup((__nFInstance)->id); \
+        ((__cTX).nf_instance) = __nFInstance; \
         if ((__nFInstance)->time.validity_duration) { \
             ((__cTX).validity_timeout) = (__nFInstance)->t_validity->timeout; \
         } else { \
             ((__cTX).validity_timeout) = 0; \
         } \
-        ogs_info("[%s] Setup NF Instance [type:%s validity:%d timeout:%lds]", \
-                ((__cTX).nf_instance_id), \
+        ogs_info("[%s] NF Instance setup [type:%s validity:%ds]", \
+                (__nFInstance)->id, \
                 OpenAPI_nf_type_ToString((__nFInstance)->nf_type), \
-                (__nFInstance)->time.validity_duration, \
-                (long)((__cTX).validity_timeout)); \
+                (__nFInstance)->time.validity_duration); \
     } while(0)
-#else
-#define OGS_SBI_SETUP_NF_INSTANCE(__cTX, __nFInstance) \
-    do { \
-        ogs_assert(__nFInstance); \
-        ogs_assert((__nFInstance)->id); \
-        ogs_assert((__nFInstance)->nf_type); \
-        \
-        if ((__cTX).nf_instance_id) { \
-            ogs_warn("[%s] Unlink NF Instance [type:%s]", \
-                    ((__cTX).nf_instance_id), \
-                    OpenAPI_nf_type_ToString((__nFInstance)->nf_type)); \
-            ogs_free((__cTX).nf_instance_id); \
-        } \
-        \
-        ((__cTX).nf_instance_id) = ogs_strdup((__nFInstance)->id); \
-        ogs_info("[%s] Setup NF Instance [type:%s]", \
-                ((__cTX).nf_instance_id), \
-                OpenAPI_nf_type_ToString((__nFInstance)->nf_type)); \
-    } while(0)
-#endif
 
 /*
- * Issue #3470
+ * Search.Result stored in nf_instance->time.validity_duration;
  *
- * Previously, nf_instance pointers were stored in nf_type_array and
- * service_type_array. This led to a dangling pointer problem when an
- * nf_instance was removed via ogs_sbi_nf_instance_remove().
+ * validity_timeout = nf_instance->validity->timeout =
+ *     ogs_get_monotonic_time() + nf_instance->time.validity_duration;
  *
- * To resolve this, we now store nf_instance_id instead, and use
- * ogs_sbi_nf_instance_find(nf_instance_id) to verify the validity of an
- * nf_instance.
+ * if no validityPeriod in SearchResult, validity_timeout is 0.
  */
-#if ENABLE_VALIDITY_TIMEOUT
 #define OGS_SBI_GET_NF_INSTANCE(__cTX) \
     ((__cTX).validity_timeout == 0 || \
      (__cTX).validity_timeout > ogs_get_monotonic_time() ? \
-        (ogs_sbi_nf_instance_find((__cTX).nf_instance_id)) : NULL)
-#else
-#define OGS_SBI_GET_NF_INSTANCE(__cTX) \
-        ogs_sbi_nf_instance_find((__cTX).nf_instance_id)
-#endif
+        ((__cTX).nf_instance) : NULL)
+
+#define OGS_SBI_NF_INSTANCE_VALID(__nFInstance) \
+    (((__nFInstance) && ((__nFInstance)->t_validity) && \
+     ((__nFInstance)->time.validity_duration == 0 || \
+      (__nFInstance)->t_validity->timeout > ogs_get_monotonic_time())) ? \
+         true : false)
 
 bool ogs_sbi_discovery_param_is_matched(
         ogs_sbi_nf_instance_t *nf_instance,
@@ -604,9 +549,6 @@ bool ogs_sbi_discovery_option_requester_plmn_list_is_matched(
         ogs_sbi_nf_instance_t *nf_instance,
         ogs_sbi_discovery_option_t *discovery_option);
 bool ogs_sbi_discovery_option_target_plmn_list_is_matched(
-        ogs_sbi_nf_instance_t *nf_instance,
-        ogs_sbi_discovery_option_t *discovery_option);
-bool ogs_sbi_discovery_option_hnrf_uri_is_matched(
         ogs_sbi_nf_instance_t *nf_instance,
         ogs_sbi_discovery_option_t *discovery_option);
 
@@ -644,6 +586,7 @@ bool ogs_sbi_supi_in_vplmn(char *supi);
 bool ogs_sbi_plmn_id_in_vplmn(ogs_plmn_id_t *plmn_id);
 bool ogs_sbi_fqdn_in_vplmn(char *fqdn);
 
+/* OpenSSL Key Log Callback */
 void ogs_sbi_keylog_callback(const SSL *ssl, const char *line);
 
 #ifdef __cplusplus
