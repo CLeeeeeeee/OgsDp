@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: context.h
+ * 组件: dmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:06 CST
+ */
+
 #ifndef DMF_CONTEXT_H
 #define DMF_CONTEXT_H
 
@@ -16,6 +26,14 @@ typedef struct dmf_gnb_s {
 typedef struct dmf_context_s {
     ogs_list_t gnb_list;
     ogs_sbi_object_t sbi; /* 用于 ogs_sbi_xact_add/发现与发送 */
+    
+    /* SBI 服务器配置 */
+    const char *sbi_addr;
+    uint16_t sbi_port;
+    
+    /* Metrics 服务器配置 */
+    const char *metrics_addr;
+    uint16_t metrics_port;
 } dmf_context_t;
 
 dmf_context_t *dmf_context_self(void);

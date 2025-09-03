@@ -27,7 +27,7 @@ typedef enum {OpenAPI_nf_type_NULL = 0, OpenAPI_nf_type_NRF, OpenAPI_nf_type_UDM
     OpenAPI_nf_type_NSACF, OpenAPI_nf_type_MFAF, OpenAPI_nf_type_EASDF, OpenAPI_nf_type_DCCF, OpenAPI_nf_type_MB_SMF, 
     OpenAPI_nf_type_TSCTSF, OpenAPI_nf_type_ADRF, OpenAPI_nf_type_GBA_BSF, OpenAPI_nf_type_CEF, OpenAPI_nf_type_MB_UPF, 
     OpenAPI_nf_type_NSWOF, OpenAPI_nf_type_PKMF, OpenAPI_nf_type_MNPF, OpenAPI_nf_type_SMS_GMSC, OpenAPI_nf_type_SMS_IWMSC, 
-    OpenAPI_nf_type_MBSF, OpenAPI_nf_type_MBSTF, OpenAPI_nf_type_PANF, OpenAPI_nf_type_DMF, OpenAPI_nf_type_DSMF, OpenAPI_nf_type_DF } OpenAPI_nf_type_e;
+    OpenAPI_nf_type_MBSF, OpenAPI_nf_type_MBSTF, OpenAPI_nf_type_PANF, OpenAPI_nf_type_DMF, OpenAPI_nf_type_DSMF, OpenAPI_nf_type_DF, OpenAPI_nf_type_DNF } OpenAPI_nf_type_e;
 
 char* OpenAPI_nf_type_ToString(OpenAPI_nf_type_e nf_type);
 

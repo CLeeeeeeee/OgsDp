@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: dn4-handler.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:11 CST
+ */
+
 #include "context.h"
 #include "dn4-handler.h"
 #include "dn4-build.h"
@@ -114,15 +124,25 @@ void dsmf_dn4_handle_session_establishment(dsmf_sess_t *sess)
     ogs_pfcp_xact_t *xact = NULL;
     ogs_pkbuf_t *pkbuf = NULL;
     ogs_pfcp_header_t h;
+    ogs_pfcp_node_t *df_node = NULL;
     int rv;
     
     ogs_assert(sess);
-    ogs_assert(sess->pfcp_node);
+    
+    /* 通过 NRF 发现 DF 节点 */
+    df_node = dsmf_discover_df_node();
+    if (!df_node) {
+        ogs_error("[DSMF] Failed to discover DF node for session establishment");
+        return;
+    }
+    
+    /* 保存 DF 节点到会话 */
+    sess->pfcp_node = df_node;
     
     ogs_info("Sending PFCP Session Establishment Request for session [%s]", sess->session_ref);
     
     /* 创建 PFCP 事务 */
-    xact = ogs_pfcp_xact_local_create(sess->pfcp_node, session_timeout, OGS_UINT_TO_POINTER(sess->id));
+    xact = ogs_pfcp_xact_local_create(df_node, session_timeout, OGS_UINT_TO_POINTER(sess->id));
     if (!xact) {
         ogs_error("Failed to create PFCP transaction");
         return;
@@ -134,7 +154,8 @@ void dsmf_dn4_handle_session_establishment(dsmf_sess_t *sess)
     /* 构建 PFCP 消息头 */
     memset(&h, 0, sizeof(ogs_pfcp_header_t));
     h.type = OGS_PFCP_SESSION_ESTABLISHMENT_REQUEST_TYPE;
-    h.seid = sess->dsmf_dn4_seid;
+    /* 29.244 7.2.2.4.2: 首个会话建立请求 Header.SEID 必须为 0 */
+    h.seid = 0;
     
     /* 构建 PFCP 会话建立请求 */
     pkbuf = dsmf_dn4_build_session_establishment_request(sess);

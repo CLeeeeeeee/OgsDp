@@ -83,9 +83,10 @@
      { OpenAPI_nf_type_SPAF, OGS_SBI_SERVICE_NAME_NSPAF_SECURED_PACKET },
      { OpenAPI_nf_type_UDSF, OGS_SBI_SERVICE_NAME_NUDSF_DR },
      { OpenAPI_nf_type_NSSAAF, OGS_SBI_SERVICE_NAME_NNSSAAF_NSSAA },
-     { OpenAPI_nf_type_DMF, OGS_SBI_SERVICE_NAME_NDMF_GNB_SYNC },
-     { OpenAPI_nf_type_DF, OGS_SBI_SERVICE_NAME_NDF_PFCP },
-     { OpenAPI_nf_type_DSMF, OGS_SBI_SERVICE_NAME_NDSMF_PDUSESSION },
+         { OpenAPI_nf_type_DMF, OGS_SBI_SERVICE_NAME_NDMF_GNB_SYNC },
+    { OpenAPI_nf_type_DF, OGS_SBI_SERVICE_NAME_NDF_PDUSESSION },
+    { OpenAPI_nf_type_DNF, OGS_SBI_SERVICE_NAME_NDNF_DATA_FORWARDING },
+    { OpenAPI_nf_type_DSMF, OGS_SBI_SERVICE_NAME_NDSMF_PDUSESSION },
  };
  
  OpenAPI_nf_type_e ogs_sbi_service_type_to_nf_type(ogs_sbi_service_type_e type)

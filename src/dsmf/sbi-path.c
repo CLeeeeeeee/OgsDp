@@ -1,6 +1,18 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: sbi-path.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:10 CST
+ */
+
 #include "context.h"
 #include "sbi-path.h"
 #include "event.h"
+#include "pfcp-path.h"
+#include "dn4-handler.h"
 #include "dsmf-sm.h"
 #include "ogs-core.h"
 
@@ -60,7 +72,7 @@ void dsmf_sbi_close(void)
 
 int dsmf_sbi_server_handler(ogs_sbi_request_t *request, void *data)
 {
-    ogs_sbi_stream_t *stream = (ogs_sbi_stream_t *)data;
+    ogs_sbi_stream_t *stream = ogs_sbi_stream_find_by_id((ogs_pool_id_t)(uintptr_t)data);
     ogs_sbi_message_t sbi_message;
     int rv;
 
@@ -94,7 +106,7 @@ int dsmf_sbi_server_handler(ogs_sbi_request_t *request, void *data)
 int dsmf_sbi_handle_gnb_sync_request(ogs_sbi_stream_t *stream, ogs_sbi_message_t *message, ogs_sbi_request_t *request)
 {
     ogs_sbi_response_t *response = NULL;
-    dsmf_event_t *e = NULL;
+    /* 事件改为由 dsmf_context_add_gnb_with_ran_info 内部派发，这里不再直接使用 e */
     int rv;
 
     ogs_assert(stream);
@@ -175,7 +187,13 @@ int dsmf_sbi_handle_gnb_sync_request(ogs_sbi_stream_t *stream, ogs_sbi_message_t
 
     ogs_info("[DSMF] Parsed RAN addr: gnb=%s session=%s addr=%s:%d teid=0x%x",
              gnb_id, session_id, ran_addr_str, ran_port, teid);
-    /* 先回204，释放HTTP/2流，再异步派发事件 */
+
+    /* 先派发事件，确保流程不中断（即使 HTTP/2 回包失败） */
+    dsmf_context_add_gnb_with_ran_info(gnb_id, session_id, ran_addr_str, ran_port, teid);
+    ogs_info("[DSMF] Dispatched RAN addr via context: gnb=%s session=%s addr=%s:%d teid=0x%x",
+             gnb_id, session_id, ran_addr_str, ran_port, teid);
+
+    /* 再尝试回 200/空体，若远端已关闭则记录告警但不影响主流程 */
     response = ogs_sbi_response_new();
     ogs_assert(response);
     response->status = OGS_SBI_HTTP_STATUS_OK;
@@ -185,29 +203,9 @@ int dsmf_sbi_handle_gnb_sync_request(ogs_sbi_stream_t *stream, ogs_sbi_message_t
             OGS_SBI_CONTENT_TYPE, OGS_SBI_CONTENT_JSON_TYPE);
     rv = ogs_sbi_server_send_response(stream, response);
     if (rv != OGS_OK) {
-        ogs_error("ogs_sbi_server_send_response() failed [%d]", rv);
-        ogs_sbi_response_free(response);
-        return OGS_ERROR;
+        ogs_warn("ogs_sbi_server_send_response() failed [%d], continue without response", rv);
     }
 
-    /* 创建事件 */
-    e = dsmf_event_new(DSMF_EVT_RAN_SYNC_REQUEST);
-    ogs_assert(e);
-    
-    e->ran_sync.gnb_id = gnb_id;
-    e->ran_sync.session_id = session_id;
-    e->ran_sync.ran_addr_str = ran_addr_str;
-    e->ran_sync.ran_port = ran_port;
-    e->ran_sync.teid = teid;
-
-    /* 发送事件到状态机 */
-    rv = ogs_queue_push(ogs_app()->queue, e);
-    if (rv != OGS_OK) {
-        ogs_error("ogs_queue_push() failed [%d]", rv);
-        dsmf_event_free(e);
-        return OGS_ERROR;
-    }
-    ogs_info("[DSMF] Enqueued RAN addr to SM: gnb=%s session=%s addr=%s:%d teid=0x%x",
-             gnb_id, session_id, ran_addr_str, ran_port, teid);
+    /* 后续由 FSM 处理 RAN_SYNC 事件驱动 PFCP 建立，避免并发/重复触发 */
     return OGS_OK;
 }

@@ -95,6 +95,9 @@
 
      OGS_SBI_SERVICE_TYPE_NDF_PFCP,
 
+     /* Custom: DNF exposes ndnf-data-forwarding service name */
+     OGS_SBI_SERVICE_TYPE_NDNF_DATA_FORWARDING,
+
      /* Custom: DSMF exposes ndsmf-pdusession service name */
      OGS_SBI_SERVICE_TYPE_NDSMF_PDUSESSION,
      
@@ -162,8 +165,10 @@
  #define OGS_SBI_SERVICE_NAME_NUDSF_DR "nudsf-dr"
  #define OGS_SBI_SERVICE_NAME_NNSSAAF_NSSAA "nnssaaf-nssaa"
  #define OGS_SBI_SERVICE_NAME_NDMF_GNB_SYNC "ndmf-gnb-sync"
- #define OGS_SBI_SERVICE_NAME_NDF_PFCP "ndf-pfcp"
- #define OGS_SBI_SERVICE_NAME_NDSMF_PDUSESSION "ndsmf-pdusession"
+#define OGS_SBI_SERVICE_NAME_NDF_PFCP "ndf-pfcp"
+#define OGS_SBI_SERVICE_NAME_NDF_PDUSESSION "ndf-pdusession"
+#define OGS_SBI_SERVICE_NAME_NDNF_DATA_FORWARDING "ndnf-data-forwarding"
+#define OGS_SBI_SERVICE_NAME_NDSMF_PDUSESSION "ndsmf-pdusession"
  
  #define OGS_SBI_SERVICE_NAME_N32C_HANDSHAKE "n32c-handshake"
  

@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 df 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: pfcp-path.c
+ * 组件: df
+ * 添加时间: 2025年 08月 20日 星期三 11:16:03 CST
+ */
+
 #include "context.h"
 #include "event.h"
 #include "ndf-handler.h"
@@ -183,6 +193,7 @@ int df_pfcp_open(void)
         ogs_assert(node->poll);
     }
 
+    /* 与 UPF 一致，统一设置 PFCP 服务器资源 */
     OGS_SETUP_PFCP_SERVER;
 
     return OGS_OK;
@@ -377,51 +388,65 @@ void df_pfcp_handle_message(ogs_pfcp_node_t *pfcp_node, ogs_pfcp_message_t *mess
 
     ogs_info("Handling PFCP message: type=%d", message->h.type);
 
-    /* 根据消息类型分发到相应的处理函数 */
-    switch (message->h.type) {
-    case OGS_PFCP_HEARTBEAT_REQUEST_TYPE:
-        ogs_pfcp_handle_heartbeat_request(pfcp_node, NULL, &message->pfcp_heartbeat_request);
-        break;
-    case OGS_PFCP_HEARTBEAT_RESPONSE_TYPE:
-        ogs_pfcp_handle_heartbeat_response(pfcp_node, NULL, &message->pfcp_heartbeat_response);
-        break;
-    case OGS_PFCP_ASSOCIATION_SETUP_REQUEST_TYPE:
-        ogs_pfcp_up_handle_association_setup_request(pfcp_node, NULL, &message->pfcp_association_setup_request);
-        break;
-    case OGS_PFCP_ASSOCIATION_SETUP_RESPONSE_TYPE:
-        ogs_pfcp_up_handle_association_setup_response(pfcp_node, NULL, &message->pfcp_association_setup_response);
-        break;
-    case OGS_PFCP_SESSION_ESTABLISHMENT_REQUEST_TYPE:
-        {
-            df_sess_t *sess = df_sess_add_by_message(message);
-            if (sess) {
-                OGS_SETUP_PFCP_NODE(sess, pfcp_node);
-                df_n4_handle_session_establishment_request(sess, NULL, &message->pfcp_session_establishment_request);
-            }
+    /* 为入站消息创建/查找事务 */
+    {
+        int rv;
+        ogs_pfcp_xact_t *xact = NULL;
+        rv = ogs_pfcp_xact_receive(pfcp_node, &message->h, &xact);
+        if (rv == OGS_RETRY) {
+            /* 重传场景：事务层已处理，静默返回 */
+            return;
+        } else if (rv != OGS_OK) {
+            ogs_error("ogs_pfcp_xact_receive() failed for type=%d", message->h.type);
+            return;
         }
-        break;
-    case OGS_PFCP_SESSION_MODIFICATION_REQUEST_TYPE:
-        {
-            df_sess_t *sess = NULL;
-            if (message->h.seid_presence && message->h.seid != 0)
-                sess = df_sess_find_by_df_n4_seid(message->h.seid);
-            if (sess) {
-                df_n4_handle_session_modification_request(sess, NULL, &message->pfcp_session_modification_request);
+
+        switch (message->h.type) {
+        case OGS_PFCP_HEARTBEAT_REQUEST_TYPE:
+            ogs_pfcp_handle_heartbeat_request(pfcp_node, xact, &message->pfcp_heartbeat_request);
+            break;
+        case OGS_PFCP_HEARTBEAT_RESPONSE_TYPE:
+            ogs_pfcp_handle_heartbeat_response(pfcp_node, xact, &message->pfcp_heartbeat_response);
+            break;
+        case OGS_PFCP_ASSOCIATION_SETUP_REQUEST_TYPE:
+            ogs_pfcp_up_handle_association_setup_request(pfcp_node, xact, &message->pfcp_association_setup_request);
+            ogs_info("PFCP Association Setup handled, response should be sent");
+            break;
+        case OGS_PFCP_ASSOCIATION_SETUP_RESPONSE_TYPE:
+            ogs_pfcp_up_handle_association_setup_response(pfcp_node, xact, &message->pfcp_association_setup_response);
+            break;
+        case OGS_PFCP_SESSION_ESTABLISHMENT_REQUEST_TYPE:
+            {
+                df_sess_t *sess = df_sess_add_by_message(message);
+                if (sess) {
+                    OGS_SETUP_PFCP_NODE(sess, pfcp_node);
+                    df_n4_handle_session_establishment_request(sess, xact, &message->pfcp_session_establishment_request);
+                }
             }
-        }
-        break;
-    case OGS_PFCP_SESSION_DELETION_REQUEST_TYPE:
-        {
-            df_sess_t *sess = NULL;
-            if (message->h.seid_presence && message->h.seid != 0)
-                sess = df_sess_find_by_df_n4_seid(message->h.seid);
-            if (sess) {
-                df_n4_handle_session_deletion_request(sess, NULL, &message->pfcp_session_deletion_request);
+            break;
+        case OGS_PFCP_SESSION_MODIFICATION_REQUEST_TYPE:
+            {
+                df_sess_t *sess = NULL;
+                if (message->h.seid_presence && message->h.seid != 0)
+                    sess = df_sess_find_by_df_n4_seid(message->h.seid);
+                if (sess) {
+                    df_n4_handle_session_modification_request(sess, xact, &message->pfcp_session_modification_request);
+                }
             }
+            break;
+        case OGS_PFCP_SESSION_DELETION_REQUEST_TYPE:
+            {
+                df_sess_t *sess = NULL;
+                if (message->h.seid_presence && message->h.seid != 0)
+                    sess = df_sess_find_by_df_n4_seid(message->h.seid);
+                if (sess) {
+                    df_n4_handle_session_deletion_request(sess, xact, &message->pfcp_session_deletion_request);
+                }
+            }
+            break;
+        default:
+            ogs_warn("Unhandled PFCP message type: %d", message->h.type);
+            break;
         }
-        break;
-    default:
-        ogs_warn("Unhandled PFCP message type: %d", message->h.type);
-        break;
     }
 } 

@@ -1,0 +1,81 @@
+# U - 自定义组件配置文件
+# 此配置文件是用户添加的自定义组件 dnf 的配置模板
+# 不是原始 Open5GS 配置的一部分
+# 
+# 文件: dnf.yaml.in
+# 组件: dnf
+# 添加时间: 2025年 08月 25日 星期一 10:16:14 CST
+
+logger:
+  file:
+    path: @localstatedir@/log/open5gs/dnf.log
+  level: debug   # fatal|error|warn|info(default)|debug|trace
+
+global:
+  max:
+    ue: 1024  # The number of UE can be increased depending on memory size.
+
+dnf:
+  sbi:
+    server:
+      - address: 127.0.0.24
+        port: 7777
+    client:
+      nrf:
+        - uri: http://127.0.0.10:7777
+  gtpu:
+    server:
+      - address: 127.0.0.24
+        port: 2154
+  metrics:
+    server:
+      - address: 127.0.0.24
+        port: 9090
+  nf:
+    register: true
+  domf:
+    client:
+      - address: 127.0.0.25
+        port: 2155
+  session:
+    - subnet: 10.56.0.0/16
+      gateway: 10.56.0.1
+    - subnet: 2001:db8:dnf::/48
+      gateway: 2001:db8:dnf::1
+
+################################################################################
+# SBI Server
+################################################################################
+# o Override SBI address to be advertised to other NFs
+#  sbi:
+#    server:
+#      - dev: eth0
+#        advertise: open5gs-dnf.svc.local
+#
+################################################################################
+# GTP-U Server
+################################################################################
+# o Override GTP-U address to be advertised to DF
+#  gtpu:
+#    server:
+#      - dev: eth0
+#        advertise: open5gs-dnf.svc.local
+#
+################################################################################
+# DOMF Client
+################################################################################
+#  o Override DOMF address for data forwarding
+#  domf:
+#    client:
+#      - address: 127.0.0.25
+#        port: 2155
+#
+################################################################################
+# Session Management
+################################################################################
+#  o Data Network IP Resource information
+#  session:
+#    - subnet: 10.56.0.0/16
+#      gateway: 10.56.0.1
+#      network_instance: internet
+#      source_interface: 0

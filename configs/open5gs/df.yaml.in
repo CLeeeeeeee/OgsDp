@@ -1,7 +1,15 @@
+# U - 自定义组件配置文件
+# 此配置文件是用户添加的自定义组件 df 的配置模板
+# 不是原始 Open5GS 配置的一部分
+# 
+# 文件: df.yaml.in
+# 组件: df
+# 添加时间: 2025年 08月 20日 星期三 11:16:13 CST
+
 logger:
   file:
     path: @localstatedir@/log/open5gs/df.log
-#  level: info   # fatal|error|warn|info(default)|debug|trace
+  level: debug   # fatal|error|warn|info(default)|debug|trace
 
 global:
   max:
@@ -9,20 +17,29 @@ global:
 #    peer: 64
 
 df:
+  sbi:
+    server:
+      - address: 127.0.0.22
+        port: 7779
+    client:
+      nrf:
+        - uri: http://127.0.0.10:7777
+  nf:
+    register: true
   pfcp:
     server:
       - address: 127.0.0.22
         port: 8805
-    client:
-      dsmf:     #  DF PFCP Client try to associate DSMF PFCP Server
-        - address: 127.0.0.23
-          port: 8806
   dn3:
     server:
       - address: 127.0.0.22
     client:
 #      ran:     #  DF DN3 Client try to associate RAN DN3 Server
 #        - address: 127.0.0.21
+  dn4:
+    client:
+      - address: 127.0.0.24
+        port: 2154
   gtpu:
     server:
       - address: 127.0.0.22

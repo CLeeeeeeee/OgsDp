@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: dsmf-sm.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:11 CST
+ */
+
 #include "context.h"
 #include "pfcp-path.h"
 #include "sbi-path.h"
@@ -184,8 +194,7 @@ void dsmf_session_state_wait_ran_sync(ogs_fsm_t *s, dsmf_event_t *e)
         ogs_info("[DSMF] SM got RAN addr: gnb=%s session=%s addr=%s:%d teid=0x%x",
              e->ran_sync.gnb_id, e->ran_sync.session_id,
              e->ran_sync.ran_addr_str, e->ran_sync.ran_port, e->ran_sync.teid);
-        /* 触发 PFCP 会话建立 */
-        dsmf_sess_establish(sess);
+        /* 切换到等待 PFCP 建立状态，由该状态的 ENTRY 中统一发起 SEReq */
         OGS_FSM_TRAN(s, &dsmf_session_state_wait_pfcp_establishment);
         break;
 

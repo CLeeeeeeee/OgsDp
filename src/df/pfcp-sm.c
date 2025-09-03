@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 df 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: pfcp-sm.c
+ * 组件: df
+ * 添加时间: 2025年 08月 20日 星期三 11:16:03 CST
+ */
+
 #include "context.h"
 #include "event.h"
 #include "pfcp-path.h"
@@ -52,7 +62,7 @@ void df_pfcp_state_will_associate(ogs_fsm_t *s, df_event_t *e)
 
     ogs_assert(OGS_FSM_STATE(&node->sm));
 
-    switch (e->id) {
+    switch (e->h.id) {
     case OGS_FSM_ENTRY_SIG:
         break;
 
@@ -109,7 +119,7 @@ void df_pfcp_state_associated(ogs_fsm_t *s, df_event_t *e)
 
     ogs_assert(OGS_FSM_STATE(&node->sm));
 
-    switch (e->id) {
+    switch (e->h.id) {
     case OGS_FSM_ENTRY_SIG:
         break;
 
@@ -162,7 +172,7 @@ void df_pfcp_state_exception(ogs_fsm_t *s, df_event_t *e)
 
     ogs_assert(OGS_FSM_STATE(&node->sm));
 
-    switch (e->id) {
+    switch (e->h.id) {
     case OGS_FSM_ENTRY_SIG:
         break;
     case OGS_FSM_EXIT_SIG:

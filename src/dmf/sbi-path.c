@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: sbi-path.c
+ * 组件: dmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:07 CST
+ */
+
 #include "sbi-path.h"
 #include "context.h"
 #include "handler.h"
@@ -17,6 +27,7 @@ int dmf_sbi_open(void)
     ogs_sbi_nf_instance_build_default(nf_instance);
     ogs_sbi_nf_instance_add_allowed_nf_type(nf_instance, OpenAPI_nf_type_AMF);
     ogs_sbi_nf_instance_add_allowed_nf_type(nf_instance, OpenAPI_nf_type_DSMF);
+    ogs_sbi_nf_instance_add_allowed_nf_type(nf_instance, OpenAPI_nf_type_DF);
 
     /* Build NF service information. It will be transmitted to NRF. */
     service = ogs_sbi_nf_service_build_default(

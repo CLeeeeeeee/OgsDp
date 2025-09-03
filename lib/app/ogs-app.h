@@ -109,6 +109,9 @@ void df_terminate(void);
 int dsmf_initialize(void);
 void dsmf_terminate(void);
 
+int dnf_initialize(void);
+void dnf_terminate(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: dmf-sm.c
+ * 组件: dmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:06 CST
+ */
+
 
 #include "dmf-sm.h"
 #include "handler.h"
@@ -148,8 +158,9 @@ void dmf_state_operational(ogs_fsm_t *s, dmf_event_t *e)
                                     response->http.content_length = 2;
                                     ogs_sbi_header_set(response->http.headers,
                                             OGS_SBI_CONTENT_TYPE, OGS_SBI_CONTENT_JSON_TYPE);
-                                    rv = ogs_sbi_server_send_response(stream, response);
-                                    if (rv != OGS_OK) ogs_error("dmf rsp send failed [%d]", rv);
+                                    if (OGS_OK != ogs_sbi_server_send_response(stream, response)) {
+                                        ogs_warn("dmf rsp send failed; continue");
+                                    }
                                     responded = true;
                                 }
                                 // 异步转发给 DSMF（在响应发送之后）
@@ -180,8 +191,9 @@ void dmf_state_operational(ogs_fsm_t *s, dmf_event_t *e)
                                 response->http.content_length = 2;
                                 ogs_sbi_header_set(response->http.headers,
                                         OGS_SBI_CONTENT_TYPE, OGS_SBI_CONTENT_JSON_TYPE);
-                                rv = ogs_sbi_server_send_response(stream, response);
-                                if (rv != OGS_OK) ogs_error("dmf rsp send failed [%d]", rv);
+                                if (OGS_OK != ogs_sbi_server_send_response(stream, response)) {
+                                    ogs_warn("dmf rsp send failed; continue");
+                                }
                                 responded = true;
                             }
                         }

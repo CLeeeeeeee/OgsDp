@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: context.c
+ * 组件: dmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:05 CST
+ */
+
 /* dmf-context.c */
 #include "context.h"
 
@@ -149,10 +159,182 @@ void dmf_forward_to_dsmf(const char *gnb_id, const char *session_id,
 
 int dmf_context_parse_config(void)
 {
-    ogs_assert(ogs_app()->file);
-    
+    yaml_document_t *document = NULL;
+    ogs_yaml_iter_t root_iter;
+    int idx = 0;
+
+    document = ogs_app()->document;
+    ogs_assert(document);
+
     // 初始化gNB列表
     ogs_list_init(&_dmf_self.gnb_list);
+
+    ogs_yaml_iter_init(&root_iter, document);
+    while (ogs_yaml_iter_next(&root_iter)) {
+        const char *root_key = ogs_yaml_iter_key(&root_iter);
+        ogs_assert(root_key);
+        if ((!strcmp(root_key, "dmf")) &&
+            (idx++ == ogs_app()->config_section_id)) {
+            ogs_yaml_iter_t dmf_iter;
+            ogs_yaml_iter_recurse(&root_iter, &dmf_iter);
+            while (ogs_yaml_iter_next(&dmf_iter)) {
+                const char *dmf_key = ogs_yaml_iter_key(&dmf_iter);
+                ogs_assert(dmf_key);
+                
+                if (!strcmp(dmf_key, "sbi")) {
+                    ogs_yaml_iter_t sbi_iter;
+                    ogs_yaml_iter_recurse(&dmf_iter, &sbi_iter);
+                    while (ogs_yaml_iter_next(&sbi_iter)) {
+                        const char *sbi_key = ogs_yaml_iter_key(&sbi_iter);
+                        ogs_assert(sbi_key);
+                        
+                        if (!strcmp(sbi_key, "server")) {
+                            ogs_yaml_iter_t server_iter, server_array;
+                            ogs_yaml_iter_recurse(&sbi_iter, &server_array);
+                            do {
+                                int num = 0;
+                                const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
+
+                                if (ogs_yaml_iter_type(&server_array) ==
+                                        YAML_MAPPING_NODE) {
+                                    memcpy(&server_iter, &server_array,
+                                            sizeof(ogs_yaml_iter_t));
+                                } else if (ogs_yaml_iter_type(&server_array) ==
+                                    YAML_SEQUENCE_NODE) {
+                                    if (!ogs_yaml_iter_next(&server_array))
+                                        break;
+                                    ogs_yaml_iter_recurse(
+                                            &server_array, &server_iter);
+                                } else if (ogs_yaml_iter_type(&server_array) ==
+                                    YAML_SCALAR_NODE) {
+                                    break;
+                                } else
+                                    ogs_assert_if_reached();
+
+                                while (ogs_yaml_iter_next(&server_iter)) {
+                                    const char *server_key =
+                                        ogs_yaml_iter_key(&server_iter);
+                                    ogs_assert(server_key);
+                                    if (!strcmp(server_key, "address")) {
+                                        ogs_yaml_iter_t hostname_iter;
+                                        ogs_yaml_iter_recurse(
+                                                &server_iter, &hostname_iter);
+                                        ogs_assert(ogs_yaml_iter_type(
+                                                    &hostname_iter) !=
+                                                YAML_MAPPING_NODE);
+
+                                        do {
+                                            if (ogs_yaml_iter_type(
+                                                        &hostname_iter) ==
+                                                    YAML_SEQUENCE_NODE) {
+                                                if (!ogs_yaml_iter_next(
+                                                            &hostname_iter))
+                                                    break;
+                                            }
+
+                                            ogs_assert(num <
+                                                    OGS_MAX_NUM_OF_HOSTNAME);
+                                            hostname[num] = ogs_yaml_iter_value(
+                                                    &hostname_iter);
+                                            num++;
+                                        } while (ogs_yaml_iter_type(
+                                                    &hostname_iter) ==
+                                                YAML_SEQUENCE_NODE);
+
+                                        if (num > 0) {
+                                            _dmf_self.sbi_addr = hostname[0];
+                                        }
+                                    } else if (!strcmp(server_key, "port")) {
+                                        const char *v = ogs_yaml_iter_value(&server_iter);
+                                        if (v) _dmf_self.sbi_port = atoi(v);
+                                    }
+                                }
+                            } while (ogs_yaml_iter_type(&server_array) ==
+                                    YAML_MAPPING_NODE);
+                        }
+                    }
+                } else if (!strcmp(dmf_key, "metrics")) {
+                    ogs_yaml_iter_t metrics_iter;
+                    ogs_yaml_iter_recurse(&dmf_iter, &metrics_iter);
+                    while (ogs_yaml_iter_next(&metrics_iter)) {
+                        const char *metrics_key = ogs_yaml_iter_key(&metrics_iter);
+                        ogs_assert(metrics_key);
+                        
+                        if (!strcmp(metrics_key, "server")) {
+                            ogs_yaml_iter_t server_iter, server_array;
+                            ogs_yaml_iter_recurse(&metrics_iter, &server_array);
+                            do {
+                                int num = 0;
+                                const char *hostname[OGS_MAX_NUM_OF_HOSTNAME];
+
+                                if (ogs_yaml_iter_type(&server_array) ==
+                                        YAML_MAPPING_NODE) {
+                                    memcpy(&server_iter, &server_array,
+                                            sizeof(ogs_yaml_iter_t));
+                                } else if (ogs_yaml_iter_type(&server_array) ==
+                                    YAML_SEQUENCE_NODE) {
+                                    if (!ogs_yaml_iter_next(&server_array))
+                                        break;
+                                    ogs_yaml_iter_recurse(
+                                            &server_array, &server_iter);
+                                } else if (ogs_yaml_iter_type(&server_array) ==
+                                    YAML_SCALAR_NODE) {
+                                    break;
+                                } else
+                                    ogs_assert_if_reached();
+
+                                while (ogs_yaml_iter_next(&server_iter)) {
+                                    const char *server_key =
+                                        ogs_yaml_iter_key(&server_iter);
+                                    ogs_assert(server_key);
+                                    if (!strcmp(server_key, "address")) {
+                                        ogs_yaml_iter_t hostname_iter;
+                                        ogs_yaml_iter_recurse(
+                                                &server_iter, &hostname_iter);
+                                        ogs_assert(ogs_yaml_iter_type(
+                                                    &hostname_iter) !=
+                                                YAML_MAPPING_NODE);
+
+                                        do {
+                                            if (ogs_yaml_iter_type(
+                                                        &hostname_iter) ==
+                                                    YAML_SEQUENCE_NODE) {
+                                                if (!ogs_yaml_iter_next(
+                                                            &hostname_iter))
+                                                    break;
+                                            }
+
+                                            ogs_assert(num <
+                                                    OGS_MAX_NUM_OF_HOSTNAME);
+                                            hostname[num] = ogs_yaml_iter_value(
+                                                    &hostname_iter);
+                                            num++;
+                                        } while (ogs_yaml_iter_type(
+                                                    &hostname_iter) ==
+                                                YAML_SEQUENCE_NODE);
+
+                                        if (num > 0) {
+                                            _dmf_self.metrics_addr = hostname[0];
+                                        }
+                                    } else if (!strcmp(server_key, "port")) {
+                                        const char *v = ogs_yaml_iter_value(&server_iter);
+                                        if (v) _dmf_self.metrics_port = atoi(v);
+                                    }
+                                }
+                            } while (ogs_yaml_iter_type(&server_array) ==
+                                    YAML_MAPPING_NODE);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /* 设置默认值 */
+    if (!_dmf_self.sbi_addr) _dmf_self.sbi_addr = "127.0.0.21";
+    if (!_dmf_self.sbi_port) _dmf_self.sbi_port = 7777;
+    if (!_dmf_self.metrics_addr) _dmf_self.metrics_addr = "127.0.0.21";
+    if (!_dmf_self.metrics_port) _dmf_self.metrics_port = 9090;
     
     ogs_info("[DMF] Configuration parsed successfully");
     return OGS_OK;

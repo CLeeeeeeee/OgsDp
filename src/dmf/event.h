@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: event.h
+ * 组件: dmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:05 CST
+ */
+
 #ifndef DMF_EVENT_H
 #define DMF_EVENT_H
 
@@ -10,10 +20,6 @@ extern "C" {
 
 typedef enum {
     DMF_EVENT_BASE = OGS_MAX_NUM_OF_PROTO_EVENT,
-
-    DMF_EVENT_SBI_SERVER,
-    DMF_EVENT_SBI_CLIENT,
-    DMF_EVENT_SBI_TIMER,
 
     DMF_EVENT_GNB_SYNC,
     DMF_EVENT_GNB_DEREG,

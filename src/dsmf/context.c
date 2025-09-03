@@ -1,8 +1,21 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: context.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:07 CST
+ */
+
 #include "context.h"
 #include "event.h"
 #include "dsmf-sm.h"
 #include "ogs-core.h"
 #include "ogs-pfcp.h"
+#include "ogs-sbi.h"
+#include "dn4-handler.h"
+#include <arpa/inet.h>
 
 static dsmf_context_t _dsmf_self;
 
@@ -59,9 +72,11 @@ dsmf_sess_t *dsmf_sess_add(ogs_pfcp_f_seid_t *cp_f_seid)
 
     ogs_assert(cp_f_seid);
 
-    ogs_pool_alloc(&dsmf_sess_pool, &sess);
+    ogs_pool_id_calloc(&dsmf_sess_pool, &sess);
     ogs_assert(sess);
-    memset(sess, 0, sizeof *sess);
+
+    sess->index = ogs_pool_index(&dsmf_sess_pool, sess);
+    ogs_assert(sess->index > 0 && sess->index <= ogs_app()->pool.sess);
 
     ogs_pool_alloc(&dsmf_dn4_seid_pool, &sess->dsmf_dn4_seid_node);
     ogs_assert(sess->dsmf_dn4_seid_node);
@@ -79,15 +94,17 @@ dsmf_sess_t *dsmf_sess_add(ogs_pfcp_f_seid_t *cp_f_seid)
     ogs_hash_set(_dsmf_self.df_dn4_f_seid_hash, &sess->df_dn4_f_seid,
             sizeof(sess->df_dn4_f_seid), sess);
 
-    /* Initialize PFCP session */
+    /* Initialize PFCP session pool */
     memset(&sess->pfcp, 0, sizeof(sess->pfcp));
+    ogs_pfcp_pool_init(&sess->pfcp);
 
-    /* Initialize state machine */
-    memset(&e, 0, sizeof(e));
-    e.h.id = DSMF_EVT_SESSION_ESTABLISHMENT_REQUEST;
-    ogs_fsm_init(&sess->sm, dsmf_session_state_initial, dsmf_session_state_final, &e);
-
+    /* Initialize state machine: 先添加到会话列表，再初始化 FSM */
     ogs_list_add(&_dsmf_self.sess_list, sess);
+    
+    memset(&e, 0, sizeof(e));
+    e.h.id = OGS_FSM_ENTRY_SIG;
+    e.sess_id = sess->id;
+    ogs_fsm_init(&sess->sm, dsmf_session_state_initial, dsmf_session_state_final, &e);
 
     return sess;
 }
@@ -118,7 +135,10 @@ dsmf_sess_t *dsmf_sess_add_by_ran_sync(const char *gnb_id, const char *session_i
     ogs_pool_alloc(&dsmf_dn4_seid_pool, &seid_node);
     ogs_assert(seid_node);
     cp_f_seid.seid = *seid_node;
-    cp_f_seid.ipv4 = ogs_pfcp_self()->pfcp_addr->sin.sin_addr.s_addr;
+    if (ogs_pfcp_self()->pfcp_addr)
+        cp_f_seid.ipv4 = ogs_pfcp_self()->pfcp_addr->sin.sin_addr.s_addr;
+    else
+        cp_f_seid.ipv4 = inet_addr("127.0.0.23"); /* 兜底为 DSMF 本地地址 */
 
     sess = dsmf_sess_add(&cp_f_seid);
     ogs_assert(sess);
@@ -140,15 +160,11 @@ dsmf_sess_t *dsmf_sess_add_by_ran_sync(const char *gnb_id, const char *session_i
     sess->session_id = ogs_strdup(session_id);
     sess->ran_teid = teid;
 
-    /* 解析 RAN 地址 */
+    /* 解析 RAN 地址（由 ogs_getaddrinfo 内部分配，匹配 ogs_freeaddrinfo 释放） */
     if (ran_addr_str) {
-        sess->ran_addr = ogs_calloc(1, sizeof(ogs_sockaddr_t));
-        ogs_assert(sess->ran_addr);
-        
-        /* 使用正确的 ogs_getaddrinfo 函数调用 */
-        if (ogs_getaddrinfo(&sess->ran_addr, AF_INET, ran_addr_str, htons(ran_port), 0) != OGS_OK) {
+        sess->ran_addr = NULL;
+        if (ogs_getaddrinfo(&sess->ran_addr, AF_INET, ran_addr_str, ran_port, 0) != OGS_OK) {
             ogs_error("Invalid RAN address: %s:%d", ran_addr_str, ran_port);
-            ogs_free(sess->ran_addr);
             sess->ran_addr = NULL;
         }
     }
@@ -205,12 +221,16 @@ int dsmf_sess_remove(dsmf_sess_t *sess)
     if (sess->session_id)
         ogs_free(sess->session_id);
     if (sess->ran_addr)
-        ogs_free(sess->ran_addr);
+        ogs_freeaddrinfo(sess->ran_addr);
     if (sess->session_ref)
         ogs_free(sess->session_ref);
 
+    /* Finalize PFCP session pool */
+    ogs_pfcp_sess_clear(&sess->pfcp);
+    ogs_pfcp_pool_final(&sess->pfcp);
+
     ogs_pool_free(&dsmf_dn4_seid_pool, sess->dsmf_dn4_seid_node);
-    ogs_pool_free(&dsmf_sess_pool, sess);
+    ogs_pool_id_free(&dsmf_sess_pool, sess);
 
     return OGS_OK;
 }
@@ -341,6 +361,8 @@ void dsmf_context_add_gnb_with_ran_info(const char *gnb_id, const char *session_
         
         ogs_fsm_dispatch(&sess->sm, e);
         dsmf_event_free(e);
+
+        /* 会话建立由状态机在 wait_pfcp_establishment 状态中触发 */
     }
 }
 
@@ -361,5 +383,47 @@ void dsmf_forward_ran_info_to_df(const char *gnb_id, const char *session_id,
                  gnb_id, session_id, ran_addr_str, ran_port, teid);
     } else {
         ogs_warn("[DSMF] Session not found for RAN info forwarding: %s-%s", gnb_id, session_id);
+    }
+}
+
+/* 通过 NRF 发现 DF 节点 */
+ogs_pfcp_node_t *dsmf_discover_df_node(void)
+{
+    ogs_pfcp_node_t *df_node = NULL;
+    ogs_sockaddr_t addr;
+    
+    /* 暂时使用静态配置的 DF 地址 */
+    memset(&addr, 0, sizeof(addr));
+    addr.ogs_sa_family = AF_INET;
+    addr.sin.sin_addr.s_addr = inet_addr("127.0.0.22");
+    addr.sin.sin_port = htons(8805);
+    
+    /* 查找现有的 PFCP 节点 */
+    ogs_list_for_each(&ogs_pfcp_self()->pfcp_peer_list, df_node) {
+        if (df_node->addr_list && 
+            df_node->addr_list->sin.sin_addr.s_addr == addr.sin.sin_addr.s_addr &&
+            df_node->addr_list->sin.sin_port == addr.sin.sin_port) {
+            ogs_info("[DSMF] Found existing DF node: %s:%d", 
+                inet_ntoa(df_node->addr_list->sin.sin_addr),
+                ntohs(df_node->addr_list->sin.sin_port));
+            return df_node;
+        }
+    }
+    
+    /* 如果没有找到，创建一个新的节点并加入 PFCP peer 列表 */
+    {
+        ogs_pfcp_node_id_t node_id;
+        memset(&node_id, 0, sizeof(node_id));
+        node_id.type = OGS_PFCP_NODE_ID_IPV4;
+        node_id.addr = addr.sin.sin_addr.s_addr;
+
+        df_node = ogs_pfcp_node_add(&ogs_pfcp_self()->pfcp_peer_list, &node_id, &addr);
+        if (!df_node) {
+            ogs_error("[DSMF] Failed to add DF PFCP node");
+            return NULL;
+        }
+        ogs_info("[DSMF] Created DF node: %s:%d", 
+            inet_ntoa(addr.sin.sin_addr), ntohs(addr.sin.sin_port));
+        return df_node;
     }
 }

@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: context.h
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:09 CST
+ */
+
 #ifndef DSMF_CONTEXT_H
 #define DSMF_CONTEXT_H
 
@@ -85,6 +95,9 @@ void dsmf_context_add_gnb_with_ran_info(const char *gnb_id, const char *session_
                                        const char *ran_addr_str, uint16_t ran_port, uint32_t teid);
 void dsmf_forward_ran_info_to_df(const char *gnb_id, const char *session_id,
                                  const char *ran_addr_str, uint16_t ran_port, uint32_t teid);
+
+/* DF 发现函数 */
+ogs_pfcp_node_t *dsmf_discover_df_node(void);
 
 /* 会话管理函数 */
 dsmf_sess_t *dsmf_sess_add_by_ran_sync(const char *gnb_id, const char *session_id,

@@ -1,3 +1,11 @@
+# U - 自定义组件构建文件
+# 此构建文件是用户添加的自定义组件 df 的构建配置
+# 不是原始 Open5GS 构建系统的一部分
+# 
+# 文件: meson.build
+# 组件: df
+# 添加时间: 2025年 08月 20日 星期三 11:16:14 CST
+
 # Copyright (C) 2019 by Sukchan Lee <acetcom@gmail.com>
 
 # This file is part of Open5GS.
@@ -49,9 +57,11 @@ libdf_sources = files('''
     context.h
     df-sm.h
     pfcp-path.h
+    sbi-path.h
     ndf-build.h
     ndf-handler.h
     dn3-path.h
+    timer.h
 
     init.c
     event.c
@@ -59,9 +69,11 @@ libdf_sources = files('''
     df-sm.c
     pfcp-sm.c
     pfcp-path.c
+    sbi-path.c
     ndf-build.c
     ndf-handler.c
     dn3-path.c
+    timer.c
 '''.split())
 
 libdf = static_library('df',
@@ -70,6 +82,7 @@ libdf = static_library('df',
         libmetrics_dep,
         libpfcp_dep,
         libgtp_dep,
+        libsbi_dep,
     ],
     install : false)
 
@@ -79,6 +92,7 @@ libdf_dep = declare_dependency(
         libmetrics_dep,
         libpfcp_dep,
         libgtp_dep,
+        libsbi_dep,
     ])
 
 df_sources = files('''

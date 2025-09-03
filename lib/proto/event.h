@@ -35,11 +35,11 @@ extern const char *OGS_EVENT_NAME_SBI_TIMER;
 typedef enum {
     OGS_EVENT_BASE = OGS_FSM_USER_SIG,
 
-    OGS_EVENT_SBI_SERVER,
-    OGS_EVENT_SBI_CLIENT,
-    OGS_EVENT_SBI_TIMER,
+    OGS_EVENT_SBI_SERVER,  // SBI服务器事件
+    OGS_EVENT_SBI_CLIENT,  // SBI客户端事件
+    OGS_EVENT_SBI_TIMER,   // SBI定时器事件
 
-    OGS_MAX_NUM_OF_PROTO_EVENT,
+    OGS_MAX_NUM_OF_PROTO_EVENT, // 最大事件数
 
 } ogs_event_e;
 
@@ -48,16 +48,16 @@ typedef struct ogs_sbi_response_s ogs_sbi_response_t;
 typedef struct ogs_sbi_message_s ogs_sbi_message_t;
 
 typedef struct ogs_event_s {
-    int id;
+    int id;     // 事件ID, 存储的是ogs_event_e枚举值
     int timer_id;
 
     struct {
-        ogs_sbi_request_t *request;
-        ogs_sbi_response_t *response;
+        ogs_sbi_request_t *request; // SBI请求
+        ogs_sbi_response_t *response; // SBI响应
         void *data;
-        int state;
+        int state; // SBI状态
 
-        ogs_sbi_message_t *message;
+        ogs_sbi_message_t *message; // SBI消息
     } sbi;
 
 } ogs_event_t;

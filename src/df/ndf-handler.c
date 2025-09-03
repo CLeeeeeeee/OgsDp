@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 df 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: ndf-handler.c
+ * 组件: df
+ * 添加时间: 2025年 08月 20日 星期三 11:16:04 CST
+ */
+
 #include "context.h"
 #include "ndf-handler.h"
 #include "ndf-build.h"
@@ -68,12 +78,11 @@ void df_n4_handle_session_establishment_request(
                           sizeof(created_pdr[i]->f_teid.teid), sess);
             // 保存 RAN 地址和 TEID
             if (created_pdr[i]->f_teid.ipv4 || created_pdr[i]->f_teid.ipv6) {
-                sess->ran_addr = ogs_calloc(1, sizeof(ogs_sockaddr_t));
                 if (created_pdr[i]->f_teid.ipv4) {
                     sess->ran_addr = ogs_calloc(1, sizeof(ogs_sockaddr_t));
                     ogs_assert(sess->ran_addr);
                     sess->ran_addr->ogs_sa_family = AF_INET;
-                    sess->ran_addr->sin.sin_addr.s_addr = created_pdr[i]->f_teid.ipv4;
+                    sess->ran_addr->sin.sin_addr.s_addr = created_pdr[i]->f_teid.addr;
                 } else if (created_pdr[i]->f_teid.ipv6) {
                     sess->ran_addr = ogs_calloc(1, sizeof(ogs_sockaddr_t));
                     ogs_assert(sess->ran_addr);
@@ -180,21 +189,7 @@ void df_n4_handle_session_establishment_request(
             }
         }
 
-        if (pdr->ipv4_framed_routes) {
-            cause_value =
-                df_sess_set_ue_ipv4_framed_routes(sess,
-                        pdr->ipv4_framed_routes);
-            if (cause_value != OGS_PFCP_CAUSE_REQUEST_ACCEPTED)
-                goto cleanup;
-        }
-
-        if (pdr->ipv6_framed_routes) {
-            cause_value =
-                df_sess_set_ue_ipv6_framed_routes(sess,
-                        pdr->ipv6_framed_routes);
-            if (cause_value != OGS_PFCP_CAUSE_REQUEST_ACCEPTED)
-                goto cleanup;
-        }
+        /* DF 不需要处理 framed routes */
 
         /* Setup DF-N3-TEID & QFI Hash */
         if (pdr->f_teid_len)

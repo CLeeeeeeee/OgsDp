@@ -1,3 +1,11 @@
+# U - 自定义组件构建文件
+# 此构建文件是用户添加的自定义组件 dmf 的构建配置
+# 不是原始 Open5GS 构建系统的一部分
+# 
+# 文件: meson.build
+# 组件: dmf
+# 添加时间: 2025年 08月 20日 星期三 11:16:14 CST
+
 # Copyright (C) 2019 by Sukchan Lee <acetcom@gmail.com>
 
 # This file is part of Open5GS.
@@ -24,6 +32,7 @@ libdmf_sources = files('''
     init.c
     dmf-sm.c
     sbi-path.c
+    timer.c
 '''.split())
 
 libdmf = static_library('dmf',

@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 df 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: context.h
+ * 组件: df
+ * 添加时间: 2025年 08月 20日 星期三 11:16:04 CST
+ */
+
 #ifndef DF_CONTEXT_H
 #define DF_CONTEXT_H
 
@@ -5,6 +15,7 @@
 #include "ogs-pfcp.h"
 #include "ogs-app.h"
 #include "df-sm.h"
+#include "ogs-sbi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +40,12 @@ typedef struct df_context_s {
     struct df_route_trie_node *ipv6_framed_routes;
 
     ogs_list_t sess_list;
+
+    /* DN4 客户端配置 (DF 到 DNF) */
+    ogs_sbi_client_t *dnf_client;
+    ogs_sockaddr_t *dn4_addr;
+    uint16_t dn4_port;
+
 } df_context_t;
 
 struct df_route_trie_node {
@@ -60,9 +77,13 @@ typedef struct df_sess_s {
     ogs_pfcp_node_t *pfcp_node;
     char            *apn_dnn;          /* APN/DNN Item */
 
-    /* RAN Connection */
+    /* RAN Connection (DN3) */
     ogs_sockaddr_t  *ran_addr;         /* RAN address */
     uint32_t        ran_teid;          /* RAN TEID */
+
+    /* DNF 转发配置 (DN4) */
+    bool            forward_to_dnf;    /* 是否转发到 DNF */
+    uint32_t        dn4_teid;          /* DN4 TEID */
 } df_sess_t;
 
 void df_context_init(void);
@@ -88,8 +109,13 @@ uint8_t df_sess_set_ue_ip(df_sess_t *sess, uint8_t session_type, ogs_pfcp_pdr_t 
 uint8_t df_sess_set_ue_ipv4_framed_routes(df_sess_t *sess, char *framed_routes[]);
 uint8_t df_sess_set_ue_ipv6_framed_routes(df_sess_t *sess, char *framed_routes[]);
 
+/* DN4 转发函数 (DF 到 DNF) */
+int df_dn4_forward_to_dnf(df_sess_t *sess, ogs_pkbuf_t *pkbuf);
+int df_discover_dnf(void);
+int df_rediscover_dnf_if_needed(void);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* DF_CONTEXT_H */ 
+#endif /* DF_CONTEXT_H */

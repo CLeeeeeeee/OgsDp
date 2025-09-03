@@ -1,9 +1,20 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: pfcp-path.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:08 CST
+ */
+
 #include "sbi-path.h"
 #include "pfcp-path.h"
 #include "dn4-build.h"
 #include "dn4-handler.h"
 #include "timer.h"
 #include "dsmf-sm.h"
+#include "context.h"
 
 static void pfcp_node_fsm_init(ogs_pfcp_node_t *node, bool try_to_associate)
 {
@@ -48,6 +59,7 @@ static void pfcp_recv_cb(short when, ogs_socket_t fd, void *data)
     ogs_pfcp_message_t *message = NULL;
     ogs_pfcp_status_e pfcp_status;
     ogs_pfcp_node_id_t node_id;
+    ogs_pfcp_xact_t *xact = NULL;
 
     ogs_assert(fd != INVALID_SOCKET);
 
@@ -136,16 +148,69 @@ static void pfcp_recv_cb(short when, ogs_socket_t fd, void *data)
                 ogs_sockaddr_to_string_static(node->addr_list));
     }
 
-    e->pfcp_node = node;
-    e->pkbuf = pkbuf;
-    e->pfcp_message = message;
-
-    rv = ogs_queue_push(ogs_app()->queue, e);
-    if (rv != OGS_OK) {
-        ogs_error("ogs_queue_push() failed:%d", (int)rv);
+    /* 让 PFCP 事务层接管，并在本回调内处理关联等控制消息 */
+    rv = ogs_pfcp_xact_receive(node, &message->h, &xact);
+    if (rv == OGS_RETRY) {
+        /* 重传场景已由事务层处理 */
+        ogs_pkbuf_free(pkbuf);
+        ogs_pfcp_message_free(message);
+        dsmf_event_free(e);
+        return;
+    } else if (rv != OGS_OK) {
+        ogs_error("ogs_pfcp_xact_receive() failed type=%d", message->h.type);
         goto cleanup;
     }
 
+    switch (message->h.type) {
+    case OGS_PFCP_HEARTBEAT_REQUEST_TYPE:
+        ogs_pfcp_handle_heartbeat_request(node, xact, &message->pfcp_heartbeat_request);
+        break;
+    case OGS_PFCP_HEARTBEAT_RESPONSE_TYPE:
+        ogs_pfcp_handle_heartbeat_response(node, xact, &message->pfcp_heartbeat_response);
+        break;
+    case OGS_PFCP_ASSOCIATION_SETUP_RESPONSE_TYPE:
+        ogs_pfcp_cp_handle_association_setup_response(node, xact, &message->pfcp_association_setup_response);
+        break;
+    case OGS_PFCP_SESSION_ESTABLISHMENT_RESPONSE_TYPE:
+        /* 入队给会话状态机处理，附带 xact-id 便于后续找到事务 */
+        e->pfcp_node = node;
+        e->pkbuf = pkbuf;
+        e->pfcp_message = message;
+        if (xact) e->pfcp_xact_id = xact->id;
+        if (xact && xact->local_seid) {
+            dsmf_sess_t *sess = dsmf_sess_find_by_dsmf_dn4_seid(xact->local_seid);
+            if (sess) e->sess_id = sess->id;
+        }
+        rv = ogs_queue_push(ogs_app()->queue, e);
+        if (rv != OGS_OK) {
+            ogs_error("ogs_queue_push() failed:%d", (int)rv);
+            goto cleanup;
+        }
+        return;
+    default:
+        /* 其余消息仍入队，由状态机/后续逻辑处理 */
+        e->pfcp_node = node;
+        e->pkbuf = pkbuf;
+        e->pfcp_message = message;
+        /* 关键：保存事务ID供状态机内通过 ogs_pfcp_xact_find_by_id 取回 */
+        if (xact) e->pfcp_xact_id = xact->id;
+        /* 尝试绑定会话ID，优先用本地SEID（建立阶段响应可能带SEID=0） */
+        if (xact && xact->local_seid) {
+            dsmf_sess_t *sess = dsmf_sess_find_by_dsmf_dn4_seid(xact->local_seid);
+            if (sess) e->sess_id = sess->id;
+        }
+        rv = ogs_queue_push(ogs_app()->queue, e);
+        if (rv != OGS_OK) {
+            ogs_error("ogs_queue_push() failed:%d", (int)rv);
+            goto cleanup;
+        }
+        return;
+    }
+
+    /* 以上分支自己处理了消息，释放资源 */
+    ogs_pkbuf_free(pkbuf);
+    ogs_pfcp_message_free(message);
+    dsmf_event_free(e);
     return;
 
 cleanup:
@@ -205,7 +270,6 @@ static void sess_timeout(ogs_pfcp_xact_t *xact, void *data)
 }
 
 int dsmf_pfcp_send_session_establishment_request(
-    ogs_pfcp_node_t *df_node,
     const char *gnb_id,
     const char *session_id,
     const char *ran_addr_str,
@@ -216,12 +280,19 @@ int dsmf_pfcp_send_session_establishment_request(
     ogs_pfcp_f_seid_t cp_f_seid;
     ogs_pfcp_xact_t *xact = NULL;
     ogs_pkbuf_t *dn4buf = NULL;
+    ogs_pfcp_node_t *df_node = NULL;
     int rv;
 
-    ogs_assert(df_node);
     ogs_assert(gnb_id);
     ogs_assert(session_id);
     ogs_assert(ran_addr_str);
+
+    /* 通过 NRF 发现 DF 节点 */
+    df_node = dsmf_discover_df_node();
+    if (!df_node) {
+        ogs_error("[DSMF] Failed to discover DF node");
+        return OGS_ERROR;
+    }
 
     /* 创建会话 */
     cp_f_seid.seid = 0; /* 将在 dsmf_sess_add 中生成 */
@@ -238,21 +309,14 @@ int dsmf_pfcp_send_session_establishment_request(
     sess->gnb_id = ogs_strdup(gnb_id);
     sess->session_id = ogs_strdup(session_id);
 
-    /* 解析 RAN 地址 */
-    sess->ran_addr = ogs_calloc(1, sizeof(ogs_sockaddr_t));
-    ogs_assert(sess->ran_addr);
-
+    /* 解析 RAN 地址（由 ogs_getaddrinfo 内部分配内存） */
+    sess->ran_addr = NULL;
     if (ogs_getaddrinfo(&sess->ran_addr, AF_INET, ran_addr_str, ran_port, 0) != OGS_OK) {
         ogs_error("[DSMF] Failed to parse RAN address: %s", ran_addr_str);
         dsmf_sess_remove(sess);
         return OGS_ERROR;
     }
 
-    if (sess->ran_addr->ogs_sa_family == AF_INET) {
-        sess->ran_addr->sin.sin_port = htons(ran_port);
-    } else if (sess->ran_addr->ogs_sa_family == AF_INET6) {
-        sess->ran_addr->sin6.sin6_port = htons(ran_port);
-    }
 
     sess->ran_teid = teid;
 
@@ -273,7 +337,27 @@ int dsmf_pfcp_send_session_establishment_request(
         return OGS_ERROR;
     }
 
-    rv = ogs_pfcp_xact_commit(xact);
+    /* 设置本端 SEID，用于后续响应匹配；首个会话建立请求的 Header.SEID 必须为 0 */
+    xact->local_seid = sess->dsmf_dn4_seid;
+
+    /* 更新事务并提交发送 */
+    {
+        ogs_pfcp_header_t h;
+        memset(&h, 0, sizeof(h));
+        h.type = OGS_PFCP_SESSION_ESTABLISHMENT_REQUEST_TYPE;
+        /* 29.244 7.2.2.4.2: 会话建立请求时对端 SEID 未知，Header.SEID 置 0 */
+        h.seid = 0;
+
+        rv = ogs_pfcp_xact_update_tx(xact, &h, dn4buf);
+        if (rv != OGS_OK) {
+            ogs_error("[DSMF] ogs_pfcp_xact_update_tx() failed");
+            ogs_pfcp_xact_delete(xact);
+            dsmf_sess_remove(sess);
+            return OGS_ERROR;
+        }
+
+        rv = ogs_pfcp_xact_commit(xact);
+    }
     if (rv != OGS_OK) {
         ogs_error("[DSMF] Failed to send session establishment request");
         ogs_pfcp_xact_delete(xact);

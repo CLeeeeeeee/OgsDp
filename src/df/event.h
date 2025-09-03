@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 df 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: event.h
+ * 组件: df
+ * 添加时间: 2025年 08月 20日 星期三 11:16:03 CST
+ */
+
 #ifndef DF_EVENT_H
 #define DF_EVENT_H
 
@@ -22,7 +32,8 @@ typedef enum {
 } df_event_e;
 
 typedef struct df_event_s {
-    int id;
+    ogs_event_t h;
+
     int timer_id;
 
     ogs_pkbuf_t *pkbuf;

@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: pfcp-sm.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:09 CST
+ */
+
 #include "sbi-path.h"
 #include "pfcp-path.h"
 #include "dn4-handler.h"
@@ -35,6 +45,8 @@ void dsmf_pfcp_state_will_associate(ogs_fsm_t *s, dsmf_event_t *e)
     switch (e->h.id) {
     case OGS_FSM_ENTRY_SIG:
         ogs_info("[DSMF] PFCP will associate with DF: %s", ogs_sockaddr_to_string_static(node->addr_list));
+        /* 主动发起 PFCP Association Setup 请求，确保尽快建立关联（带回调） */
+        ogs_pfcp_cp_send_association_setup_request(node, node_timeout);
         break;
 
     case OGS_FSM_EXIT_SIG:
@@ -61,6 +73,9 @@ void dsmf_pfcp_state_will_associate(ogs_fsm_t *s, dsmf_event_t *e)
             if (xact) {
                 ogs_pfcp_handle_heartbeat_response(node, xact, &e->pfcp_message->pfcp_heartbeat_response);
             }
+        } else if (e->pfcp_message && e->pfcp_message->h.type == OGS_PFCP_VERSION_NOT_SUPPORTED_RESPONSE_TYPE) {
+            /* 若 DF 返回版本不支持，暂时保持在 will_associate，稍后可降级/兼容 */
+            ogs_warn("[DSMF] Received PFCP Version Not Supported Response");
         } else {
             dsmf_dn4_handle_message(e->pfcp_xact_id, e);
         }

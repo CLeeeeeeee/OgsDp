@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 df 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: pfcp-path.h
+ * 组件: df
+ * 添加时间: 2025年 08月 20日 星期三 11:16:05 CST
+ */
+
 #ifndef DF_PFCP_PATH_H
 #define DF_PFCP_PATH_H
 

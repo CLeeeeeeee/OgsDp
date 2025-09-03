@@ -1,3 +1,13 @@
+/*
+ * U - 自定义组件文件
+ * 此文件是用户添加的自定义组件 dsmf 的一部分
+ * 不是原始 Open5GS 代码库的一部分
+ * 
+ * 文件: event.c
+ * 组件: dsmf
+ * 添加时间: 2025年 08月 20日 星期三 11:16:07 CST
+ */
+
 #include "event.h"
 #include "ogs-core.h"
 
@@ -39,9 +49,9 @@ const char *dsmf_event_get_name(dsmf_event_t *e)
         return "DSMF_EVT_RAN_SYNC_RESPONSE";
 
     case OGS_EVENT_SBI_CLIENT:
-        return "OGS_EVENT_SBI_CLIENT";
+        return OGS_EVENT_NAME_SBI_CLIENT;
     case OGS_EVENT_SBI_TIMER:
-        return "OGS_EVENT_SBI_TIMER";
+        return OGS_EVENT_NAME_SBI_TIMER;
 
     default:
         break;
