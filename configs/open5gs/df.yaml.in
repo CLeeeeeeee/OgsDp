@@ -1,15 +1,7 @@
-# U - 自定义组件配置文件
-# 此配置文件是用户添加的自定义组件 df 的配置模板
-# 不是原始 Open5GS 配置的一部分
-# 
-# 文件: df.yaml.in
-# 组件: df
-# 添加时间: 2025年 08月 20日 星期三 11:16:13 CST
-
 logger:
   file:
     path: @localstatedir@/log/open5gs/df.log
-  level: debug   # fatal|error|warn|info(default)|debug|trace
+#  level: info   # fatal|error|warn|info(default)|debug|trace
 
 global:
   max:
@@ -17,122 +9,19 @@ global:
 #    peer: 64
 
 df:
-  sbi:
-    server:
-      - address: 127.0.0.22
-        port: 7779
-    client:
-      nrf:
-        - uri: http://127.0.0.10:7777
-  nf:
-    register: true
   pfcp:
     server:
       - address: 127.0.0.22
-        port: 8805
-  dn3:
-    server:
-      - address: 127.0.0.22
     client:
-#      ran:     #  DF DN3 Client try to associate RAN DN3 Server
-#        - address: 127.0.0.21
-  dn4:
-    client:
-      - address: 127.0.0.24
-        port: 2154
+#      dsmf:     #  DF PFCP Client try to associate DSMF PFCP Server
+#        - address: 127.0.0.23
   gtpu:
     server:
       - address: 127.0.0.22
-  session:
-    - subnet: 10.55.0.0/16
-      gateway: 10.55.0.1
-    - subnet: 2001:db8:dfdf::/48
-      gateway: 2001:db8:dfdf::1
+  session:  #不需要subnet，UE的地址不是由DSMF或DF分配
+    - gateway: 10.55.0.1
+    - gateway: 2001:db8:dfdf::1
   metrics:
     server:
       - address: 127.0.0.22
         port: 9090
-
-################################################################################
-# PFCP Server
-################################################################################
-# o Override PFCP address to be advertised to DSMF in PFCP association
-#  pfcp:
-#    server:
-#      - dev: eth0
-#        advertise: open5gs-df.svc.local
-#
-################################################################################
-# DN3 Server
-################################################################################
-#  o Override DN3 address to be advertised inside N2 messages 
-#  dn3:
-#    server:
-#      - dev: ens3
-#        advertise: df1.5gc.mnc001.mcc001.3gppnetwork.org
-#
-#  o Data Network IP Resource information
-#  dn3:
-#    server:
-#      - address:
-#        - 127.0.0.22
-#        - ::1
-#        teid_range_indication: 4
-#        teid_range: 10
-#        network_instance: internet
-#        source_interface: 0
-#      - address: 127.0.10.22
-#        teid_range_indication: 4
-#        teid_range: 5
-#        network_instance: ims
-#        source_interface: 1
-#
-################################################################################
-# GTP-U Server
-################################################################################
-#  o Override DF GTP-U address to be advertised inside N2 messages 
-#  gtpu:
-#    server:
-#      - dev: ens3
-#        advertise: df1.5gc.mnc001.mcc001.3gppnetwork.org
-#
-#  o User Plane IP Resource information
-#  gtpu:
-#    server:
-#      - address:
-#        - 127.0.0.22
-#        - ::1
-#        teid_range_indication: 4
-#        teid_range: 10
-#        network_instance: internet
-#        source_interface: 0
-#      - address: 127.0.10.22
-#        teid_range_indication: 4
-#        teid_range: 5
-#        network_instance: ims
-#        source_interface: 1
-#
-################################################################################
-# 3GPP Specification
-################################################################################
-#
-#  o Specific DNN/APN(e.g 'ims') uses 10.56.0.1/16, 2001:db8:dfdf::1/48
-#  $ sudo ip addr add 10.55.0.1/16 dev ogstun
-#  $ sudo ip addr add 2001:db8:dfdf::1/48 dev ogstun2
-#  $ sudo ip addr add 10.56.0.1/16 dev ogstun3
-#  $ sudo ip addr add 2001:db8:dfdf::1/48 dev ogstun3
-#
-#  session:
-#    - subnet: 10.55.0.0/16
-#      gateway: 10.55.0.1
-#      dnn: internet
-#    - subnet: 2001:db8:dfdf::/48
-#      dnn: internet
-#      dev: ogstun2
-#    - subnet: 10.56.0.0/16
-#      gateway: 10.56.0.1
-#      dnn: ims
-#      dev: ogstun3
-#    - subnet: 2001:db8:dfdf::/48
-#      dnn: ims
-#      dev: ogstun3 

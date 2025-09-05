@@ -66,8 +66,10 @@ int upf_initialize(void)
 
     rv = ogs_pfcp_ue_pool_generate();
     if (rv != OGS_OK) return rv;
+    //这一步DF无需实现，UE的地址不由DF或DSMF参与分配
 
     ogs_metrics_context_open(ogs_metrics_self());
+    //无需DF实现
 
     rv = upf_pfcp_open();
     if (rv != OGS_OK) return rv;

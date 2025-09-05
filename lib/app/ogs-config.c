@@ -485,7 +485,7 @@ int ogs_app_parse_local_conf(const char *local)
 {
     int rv;
     yaml_document_t *document = NULL;
-    ogs_yaml_iter_t root_iter;
+    ogs_yaml_iter_t root_iter;   //用于遍历根节点 logger级别
     int idx = 0;
 
     document = ogs_app()->document;
@@ -498,15 +498,16 @@ int ogs_app_parse_local_conf(const char *local)
     while (ogs_yaml_iter_next(&root_iter)) {
         const char *root_key = ogs_yaml_iter_key(&root_iter);
         ogs_assert(root_key);
-        if (!strcmp(root_key, local) &&
-            (idx++ == ogs_app()->config_section_id)) {
-            ogs_yaml_iter_t local_iter;
+        if (!strcmp(root_key, local) &&  //strcmp仅两组字符相等时返回0
+            (idx++ == ogs_app()->config_section_id)) {//用于处理多个重名配置
+            ogs_yaml_iter_t local_iter; //递归遍历内部子节点 serving级别
             ogs_yaml_iter_recurse(&root_iter, &local_iter);
             while (ogs_yaml_iter_next(&local_iter)) {
                 const char *local_key = ogs_yaml_iter_key(&local_iter);
-                ogs_assert(local_key);
-                if (!strcmp(local_key, "serving")) {
+                ogs_assert(local_key);//local key就是内部子节点的名称
+                if (!strcmp(local_key, "serving")) {//处理serving子节点
                     ogs_yaml_iter_t serving_array, serving_iter;
+                    //serving_array选定一个local_iter级别的数组节点，serving_iter用于遍历该级别内部的每一项
                     ogs_yaml_iter_recurse(&local_iter, &serving_array);
                     do {
                         const char *mnc = NULL, *mcc = NULL;
@@ -516,7 +517,7 @@ int ogs_app_parse_local_conf(const char *local)
                         OGS_YAML_ARRAY_NEXT(&serving_array, &serving_iter);
                         while (ogs_yaml_iter_next(&serving_iter)) {
                             const char *serving_key =
-                                ogs_yaml_iter_key(&serving_iter);
+                                ogs_yaml_iter_key(&serving_iter);//取serving_iter的key
                             ogs_assert(serving_key);
                             if (!strcmp(serving_key, "plmn_id")) {
                                 ogs_yaml_iter_t plmn_id_iter;

@@ -1,123 +1,56 @@
-/*
- * U - 自定义组件文件
- * 此文件是用户添加的自定义组件 df 的一部分
- * 不是原始 Open5GS 代码库的一部分
- * 
- * 文件: init.c
- * 组件: df
- * 添加时间: 2025年 08月 20日 星期三 11:16:04 CST
- */
-
 #include "context.h"
-#include "dn3-path.h"
+#include "gtp-path.h"
 #include "pfcp-path.h"
-#include "sbi-path.h"
-#include "event.h"
-#include "timer.h"
-#include "ogs-core.h"
 
 static ogs_thread_t *thread;
-static int initialized = 0;
 static void df_main(void *data);
+
+static int initialized = 0;
 
 int df_initialize(void)
 {
     int rv;
 
-    ogs_assert(!initialized);
-
-    // 0. 读取本地配置文件（df.yaml）
-    rv = ogs_app_parse_local_conf("df");
+#define APP_NAME "df"
+    rv = ogs_app_parse_local_conf(APP_NAME);
     if (rv != OGS_OK) return rv;
 
-    // 1. 初始化 PFCP 上下文与事务池（参考 UPF）
+    ogs_gtp_context_init(OGS_MAX_NUM_OF_GTPU_RESOURCE); 
+    //TODO 上面这个函数似乎是独属于UPF的，可能需要自己修改
     ogs_pfcp_context_init();
-    rv = ogs_pfcp_xact_init();
-    if (rv != OGS_OK) return rv;
 
-    // 2. 解析 PFCP 配置（DF 作为 PFCP 服务器）
-    rv = ogs_pfcp_context_parse_config("df", NULL);
-    if (rv != OGS_OK) {
-        ogs_error("Failed to parse PFCP configuration");
-        return rv;
-    }
-
-    // 3. 初始化 SBI 上下文，声明自己是 NF=DF
-    ogs_sbi_context_init(OpenAPI_nf_type_DF);
-
-    // 3.1 应用日志级别
-    rv = ogs_log_config_domain(ogs_app()->logger.domain, ogs_app()->logger.level);
-    if (rv != OGS_OK) return rv;
-
-    // 4. 初始化 DF 上下文
     df_context_init();
-
-    // 4.1 初始化事件池（供 PFCP/SBI 回调派发）
     df_event_init();
+    df_gtp_init();
+    //TODO 上面三个函数似乎仍未实现 需要挨个验证
 
-    // 5. 解析 SBI 配置
-    rv = ogs_sbi_context_parse_config("df", "nrf", "scp");
-    if (rv != OGS_OK) {
-        ogs_error("Failed to parse SBI configuration");
-        return rv;
-    }
-
-    // 6. 解析 DF 配置
-    rv = df_context_parse_config();
-    if (rv != OGS_OK) {
-        ogs_error("Failed to parse DF configuration");
-        return rv;
-    }
-
-    // 7. 打开 SBI 接口
-    rv = df_sbi_open();
-    if (rv != OGS_OK) {
-        ogs_error("Failed to open SBI interface");
-        return rv;
-    }
-
-    // 8. 打开DN3接口
-    rv = df_dn3_open();
-    if (rv != OGS_OK) {
-        ogs_error("Failed to open DN3 interface");
-        return rv;
-    }
-
-    // 8.1 将 DN3 socket 添加到事件循环
-    if (df_dn3_sock()) {
-        ogs_pollset_add(ogs_app()->pollset, OGS_POLLIN, df_dn3_sock()->fd, df_dn3_recv_cb, NULL);
-        ogs_info("DN3 socket added to event loop");
-    }
-
-    // 8.5 生成 PFCP UE 池（与SMF/UPF一致）
-    rv = ogs_pfcp_ue_pool_generate();
+    rv = ogs_pfcp_xact_init();   //后续改QUIC这函数要改
     if (rv != OGS_OK) return rv;
 
-    // 9. 打开PFCP接口
+    rv = ogs_log_config_domain(
+            ogs_app()->logger.domain, ogs_app()->logger.level);
+    if (rv != OGS_OK) return rv;
+
+    rv = ogs_gtp_context_parse_config(APP_NAME, "dsmf")
+    if (rv != OGS_OK) return rv;
+
+    rv = ogs_pfcp_context_parse_config(APP_NAME, "dsmf");
+    if (rv != OGS_OK) return rv;
+
+    rv = df_context_parse_config();
+    if (rv != OGS_OK) return rv;
+
     rv = df_pfcp_open();
-    if (rv != OGS_OK) {
-        ogs_error("Failed to open PFCP interface");
-        return rv;
-    }
+    if (rv != OGS_OK) return rv;
 
-    // 10. 发现 DNF 服务
-    rv = df_discover_dnf();
-    if (rv != OGS_OK) {
-        ogs_warn("Failed to discover DNF, using default configuration");
-    }
+    rv = df_gtp_open();
+    if (rv != OGS_OK) return rv;
 
-    // 11. 心跳定时器由 Open5GS 标准机制自动管理，无需手动创建
-    ogs_info("DF NRF heartbeat will be managed by Open5GS standard mechanism");
-
-    // 11. 创建主线程
     thread = ogs_thread_create(df_main, NULL);
-    if (!thread) {
-        ogs_error("Failed to create DF main thread");
-        return OGS_ERROR;
-    }
+    if (!thread) return OGS_ERROR;
 
     initialized = 1;
-    ogs_info("DF initialized");
+    
     return OGS_OK;
 }
 
